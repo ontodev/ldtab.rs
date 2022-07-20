@@ -5,7 +5,14 @@ use horned_owl::model::{Axiom, Build, Class, ClassAssertion, ClassExpression, De
 use horned_owl::model::ClassExpression::ObjectUnionOf;
 use horned_owl::ontology::set::SetOntology;
 
+
+use rio_xml::{RdfXmlParser, RdfXmlError};
+use rio_api::parser::TriplesParser;
+use rio_api::model::*;
+
 use im::{HashSet, hashset};
+
+pub mod xml;
 
 
 pub fn print_expression(expr: &ClassExpression) {
@@ -35,4 +42,7 @@ fn main() {
         }
         Err(error) => { dbg!("ERROR: {}", error); }
     } 
+
+    xml::parser::parse("ontology.owl");
+
 }
