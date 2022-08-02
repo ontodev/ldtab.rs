@@ -2,12 +2,25 @@ use serde_json::{Value};
 use serde_json::json; 
 use horned_owl::model::{Class, ClassExpression, NamedIndividual, ObjectProperty, ObjectPropertyExpression, SubObjectPropertyExpression, SubObjectPropertyOf, Individual, AnonymousIndividual, DataProperty, DataRange, Datatype, Literal, FacetRestriction, Facet};
 
+pub fn translate_sub_object_property_expression(expression: &SubObjectPropertyExpression) -> Value {
+     match expression {
+         SubObjectPropertyExpression::ObjectPropertyChain(x) => {
+            let operator = Value::String(String::from("ObjectPropertyChain"));
+            let mut operands : Vec<Value> = x.into_iter()
+                                         .map(|x| translate_property_expression(&x))
+                                         .collect(); 
+             operands.insert(0,operator);
+             Value::Array(operands) 
+         }, 
+         SubObjectPropertyExpression::ObjectPropertyExpression(x) => translate_property_expression(&x), 
+     } 
+}
+
 
 pub fn translate_property_expression(expression: &ObjectPropertyExpression) -> Value { 
 
      match expression {
          ObjectPropertyExpression::ObjectProperty(x) => translate_object_property(&x),
-         //TODO: this means I cannot nest the inverse operator?
          ObjectPropertyExpression::InverseObjectProperty(x) => translate_object_property(&x),
      } 
 }
@@ -140,7 +153,7 @@ pub fn translate_object_cardinality(operator : &str, cardinality : &u32, propert
     let expression : ClassExpression = *filler.clone();
 
     let operator = Value::String(String::from(operator));
-    let cardinality = json!(cardinality);
+    let cardinality = json!(cardinality.to_string());
     let filler = translate_class_expression(&expression);
     let property = translate_property_expression(property);
 
@@ -300,7 +313,7 @@ pub fn translate_data_has_value(property : &DataProperty, literal : &Literal ) -
 pub fn translate_data_cardinality(operator : &str, cardinality : &u32, property : &DataProperty, filler : &DataRange ) -> Value { 
 
     let operator = Value::String(String::from(operator));
-    let cardinality = json!(cardinality);
+    let cardinality = json!(cardinality.to_string());
     let filler = translate_data_range(filler);
     let property = translate_data_property(property);
 
