@@ -1,6 +1,6 @@
 use serde_json::{Value};
 use serde_json::json; 
-use horned_owl::model::{Axiom, Build, Class, SubClassOf, ClassAssertion, ClassExpression, DeclareClass, DeclareNamedIndividual, DisjointClasses, DisjointUnion, EquivalentClasses, EquivalentObjectProperties, NamedIndividual, ObjectProperty, ObjectPropertyDomain, ObjectPropertyExpression, SubObjectPropertyExpression, SubObjectPropertyOf, TransitiveObjectProperty, Individual, ObjectPropertyAssertion, AnonymousIndividual, DataProperty, DataRange, Datatype, Literal, FacetRestriction, Facet};
+use horned_owl::model::{Class, ClassExpression, NamedIndividual, ObjectProperty, ObjectPropertyExpression, SubObjectPropertyExpression, SubObjectPropertyOf, Individual, AnonymousIndividual, DataProperty, DataRange, Datatype, Literal, FacetRestriction, Facet};
 
 
 pub fn translate_property_expression(expression: &ObjectPropertyExpression) -> Value { 
@@ -337,22 +337,3 @@ pub fn translate_class_expression(expression: &ClassExpression) -> Value {
     }
 }
 
-//TODO: provide translation for all axiom types
-pub fn translate_subclass_of(axiom: &SubClassOf) -> Value { 
-
-    let operator = Value::String(String::from("SubClassOf"));
-    let subclass = translate_class_expression(&axiom.sub);
-    let superclass = translate_class_expression(&axiom.sup);
-    let v = vec![operator, subclass, superclass];
-    Value::Array(v) 
-}
-
-pub fn translate_equivalent_classes(axiom : &EquivalentClasses) -> Value {
-    let operator = Value::String(String::from("EquivalentClasses"));
-    let classes = axiom.0.clone();
-    let mut operands : Vec<Value> = classes.into_iter()
-                                         .map(|x| translate_class_expression(&x))
-                                         .collect(); 
-    operands.insert(0,operator);
-    Value::Array(operands) 
-}
