@@ -1,23 +1,31 @@
 use serde_json::{Value};
 use serde_json::json; 
-use horned_owl::model::{Class, ClassExpression, NamedIndividual, ObjectProperty, ObjectPropertyExpression, SubObjectPropertyExpression, SubObjectPropertyOf, Individual, AnonymousIndividual, DataProperty, DataRange, Datatype, Literal, FacetRestriction, Facet};
+use horned_owl::model::{Class, ClassExpression, NamedIndividual, ObjectProperty, ObjectPropertyExpression, SubObjectPropertyExpression, Individual, AnonymousIndividual, DataProperty, DataRange, Datatype, Literal, FacetRestriction, Facet, PropertyExpression};
 
 pub fn translate_sub_object_property_expression(expression: &SubObjectPropertyExpression) -> Value {
      match expression {
          SubObjectPropertyExpression::ObjectPropertyChain(x) => {
             let operator = Value::String(String::from("ObjectPropertyChain"));
             let mut operands : Vec<Value> = x.into_iter()
-                                         .map(|x| translate_property_expression(&x))
+                                         .map(|x| translate_object_property_expression(&x))
                                          .collect(); 
              operands.insert(0,operator);
              Value::Array(operands) 
          }, 
-         SubObjectPropertyExpression::ObjectPropertyExpression(x) => translate_property_expression(&x), 
+         SubObjectPropertyExpression::ObjectPropertyExpression(x) => translate_object_property_expression(&x), 
      } 
 }
 
+pub fn translate_property_expression(expression : &PropertyExpression) -> Value {
+    match expression {
+        PropertyExpression::ObjectPropertyExpression(x) => translate_object_property_expression(&x),
+        PropertyExpression::DataProperty(x) => translate_data_property(&x),
+        PropertyExpression::AnnotationProperty(x) => json!("TODO"),  //TODO
+    } 
+}
 
-pub fn translate_property_expression(expression: &ObjectPropertyExpression) -> Value { 
+
+pub fn translate_object_property_expression(expression: &ObjectPropertyExpression) -> Value { 
 
      match expression {
          ObjectPropertyExpression::ObjectProperty(x) => translate_object_property(&x),
@@ -101,7 +109,7 @@ pub fn translate_object_some_values_from(property : &ObjectPropertyExpression, f
 
     let operator = Value::String(String::from("ObjectSomeValuesFrom"));
     let filler = translate_class_expression(&expression);
-    let property = translate_property_expression(property);
+    let property = translate_object_property_expression(property);
 
     let mut res = vec![operator];
     res.push(property);
@@ -115,7 +123,7 @@ pub fn translate_object_all_values_from(property : &ObjectPropertyExpression, fi
 
     let operator = Value::String(String::from("ObjectAllValuesFrom"));
     let filler = translate_class_expression(&expression);
-    let property = translate_property_expression(property);
+    let property = translate_object_property_expression(property);
 
     let mut res = vec![operator];
     res.push(property);
@@ -128,7 +136,7 @@ pub fn translate_object_has_value(property : &ObjectPropertyExpression, value : 
 
     let operator = Value::String(String::from("ObjectAllValuesFrom"));
     let value = translate_individual(value);
-    let property = translate_property_expression(property);
+    let property = translate_object_property_expression(property);
 
     let mut res = vec![operator];
     res.push(property);
@@ -140,7 +148,7 @@ pub fn translate_object_has_value(property : &ObjectPropertyExpression, value : 
 pub fn translate_object_has_self(property : &ObjectPropertyExpression) -> Value {
 
     let operator = Value::String(String::from("ObjectHasSelf"));
-    let property = translate_property_expression(property);
+    let property = translate_object_property_expression(property);
 
     let mut res = vec![operator];
     res.push(property);
@@ -155,7 +163,7 @@ pub fn translate_object_cardinality(operator : &str, cardinality : &u32, propert
     let operator = Value::String(String::from(operator));
     let cardinality = json!(cardinality.to_string());
     let filler = translate_class_expression(&expression);
-    let property = translate_property_expression(property);
+    let property = translate_object_property_expression(property);
 
     let mut res = vec![operator];
     res.push(cardinality);
