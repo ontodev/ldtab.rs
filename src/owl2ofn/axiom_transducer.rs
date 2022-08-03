@@ -1,18 +1,19 @@
 use serde_json::{Value};
 use serde_json::json; 
 use crate::owl2ofn::expression_transducer as expression_transducer;
-use horned_owl::model::{Axiom, Build, Class, SubClassOf, ClassAssertion, ClassExpression, DeclareClass, DeclareObjectProperty, DeclareDatatype, DeclareDataProperty, DeclareNamedIndividual, DisjointClasses, DisjointUnion, EquivalentClasses, EquivalentObjectProperties, NamedIndividual, ObjectProperty, ObjectPropertyDomain, ObjectPropertyExpression, SubObjectPropertyExpression, SubObjectPropertyOf, TransitiveObjectProperty, Individual, ObjectPropertyAssertion, AnonymousIndividual, DataProperty, DataRange, Datatype, Literal, FacetRestriction, Facet, ReflexiveObjectProperty, IrreflexiveObjectProperty, SymmetricObjectProperty, AsymmetricObjectProperty, ObjectPropertyRange, InverseObjectProperties, FunctionalObjectProperty, InverseFunctionalObjectProperty, DisjointObjectProperties, Import, SubDataPropertyOf, EquivalentDataProperties, DisjointDataProperties, DataPropertyDomain, DataPropertyRange, FunctionalDataProperty, DatatypeDefinition, HasKey, SameIndividual, DifferentIndividuals, NegativeObjectPropertyAssertion, DataPropertyAssertion, NegativeDataPropertyAssertion};
+use crate::owl2ofn::annotation_transducer as annotation_transducer;
+use horned_owl::model::{Axiom, SubClassOf, ClassAssertion, DeclareClass, DeclareObjectProperty, DeclareDatatype, DeclareDataProperty, DeclareNamedIndividual, DisjointClasses, DisjointUnion, EquivalentClasses, EquivalentObjectProperties, ObjectPropertyDomain, ObjectPropertyExpression, SubObjectPropertyOf, TransitiveObjectProperty, ObjectPropertyAssertion, ReflexiveObjectProperty, IrreflexiveObjectProperty, SymmetricObjectProperty, AsymmetricObjectProperty, ObjectPropertyRange, InverseObjectProperties, FunctionalObjectProperty, InverseFunctionalObjectProperty, DisjointObjectProperties, Import, SubDataPropertyOf, EquivalentDataProperties, DisjointDataProperties, DataPropertyDomain, DataPropertyRange, FunctionalDataProperty, DatatypeDefinition, HasKey, SameIndividual, DifferentIndividuals, NegativeObjectPropertyAssertion, DataPropertyAssertion, NegativeDataPropertyAssertion, AnnotationAssertion, OntologyAnnotation, DeclareAnnotationProperty, SubAnnotationPropertyOf, AnnotationPropertyDomain, AnnotationPropertyRange};
 
 
 pub fn translate(axiom : &Axiom) -> Value {
 
     match axiom {
-        Axiom::OntologyAnnotation(x) => json!("[TODO ontology annotation]"),
+        Axiom::OntologyAnnotation(x) => translate_ontology_annotation(x),
         Axiom::Import(x) => translate_import(x),
 
         Axiom::DeclareClass(x) => translate_class_declaration(x),
         Axiom::DeclareObjectProperty(x) => translate_object_property_declaration(x),
-        Axiom::DeclareAnnotationProperty(x) => json!("[TODO declare annotation property]"),
+        Axiom::DeclareAnnotationProperty(x) => translate_declare_annotation_property(x),
         Axiom::DeclareDataProperty(x) => translate_data_property_declaration(x),
         Axiom::DeclareNamedIndividual(x) => translate_named_individual_declaration(x),
         Axiom::DeclareDatatype(x) => translate_datatype_declaration(x),
@@ -55,10 +56,10 @@ pub fn translate(axiom : &Axiom) -> Value {
         Axiom::DataPropertyAssertion(x) => translate_data_property_assertion(x),
         Axiom::NegativeDataPropertyAssertion(x) => translate_negative_data_property_assertion(x),
 
-        Axiom::AnnotationAssertion(x) => json!("[TODO annotation assertion]"), 
-        Axiom::SubAnnotationPropertyOf(x) => json!("[TODO sub annotation property of]"), 
-        Axiom::AnnotationPropertyDomain(x) => json!("[TODO annotation property domain]"),
-        Axiom::AnnotationPropertyRange(x) => json!("[TODO annotation property range]"), 
+        Axiom::AnnotationAssertion(x) => translate_annotation_assertion(x),
+        Axiom::SubAnnotationPropertyOf(x) => translate_sub_annotation_property_of(x), 
+        Axiom::AnnotationPropertyDomain(x) => translate_annotation_property_domain(x),
+        Axiom::AnnotationPropertyRange(x) => translate_annotation_property_range(x), 
     } 
 }
 
@@ -428,5 +429,55 @@ pub fn translate_negative_data_property_assertion(axiom : &NegativeDataPropertyA
     let v = vec![operator, property, from, to];
     Value::Array(v) 
 }
+
+pub fn translate_annotation_assertion(axiom : &AnnotationAssertion) -> Value {
+
+    let operator = Value::String(String::from("AnnotationAssertion"));
+    let subject = annotation_transducer::translate_annotation_subject(&axiom.subject);
+    let annotation = annotation_transducer::translate_annotation(&axiom.ann);
+
+    let v = vec![operator, subject, annotation];
+    Value::Array(v) 
+}
+
+pub fn translate_ontology_annotation(axiom : &OntologyAnnotation) -> Value {
+    let operator = Value::String(String::from("OntologyAnnotation"));
+    let annotation = annotation_transducer::translate_annotation(&axiom.0);
+    let v = vec![operator, annotation];
+    Value::Array(v) 
+}
+
+pub fn translate_declare_annotation_property(axiom : &DeclareAnnotationProperty) -> Value {
+    let operator = Value::String(String::from("AnnotationProperty"));
+    let annotation = annotation_transducer::translate_annotation_property(&axiom.0);
+    let v = vec![operator, annotation];
+    let v =  Value::Array(v);
+    wrap_declaration(&v) 
+}
+
+pub fn translate_sub_annotation_property_of(axiom : &SubAnnotationPropertyOf) -> Value {
+    let operator = Value::String(String::from("SubAnnotationPropertyOf"));
+    let sub = annotation_transducer::translate_annotation_property(&axiom.sub);
+    let sup = annotation_transducer::translate_annotation_property(&axiom.sup);
+    let v = vec![operator, sub, sup];
+    Value::Array(v) 
+}
+
+pub fn translate_annotation_property_domain(axiom : &AnnotationPropertyDomain) -> Value {
+    let operator = Value::String(String::from("AnnotationPropertyDomain"));
+    let property = annotation_transducer::translate_annotation_property(&axiom.ap);
+    let iri = json!(axiom.iri.get(0..));
+    let v = vec![operator, property, iri];
+    Value::Array(v) 
+}
+
+pub fn translate_annotation_property_range(axiom : &AnnotationPropertyRange) -> Value {
+    let operator = Value::String(String::from("AnnotationPropertyRange"));
+    let property = annotation_transducer::translate_annotation_property(&axiom.ap);
+    let iri = json!(axiom.iri.get(0..));
+    let v = vec![operator, property, iri];
+    Value::Array(v) 
+}
+
 
 
