@@ -1,14 +1,14 @@
 use serde_json::{Value};
 use serde_json::json; 
 use crate::owl2ofn::expression_transducer as expression_transducer;
-use horned_owl::model::{Axiom, Build, Class, SubClassOf, ClassAssertion, ClassExpression, DeclareClass, DeclareObjectProperty, DeclareDatatype, DeclareDataProperty, DeclareNamedIndividual, DisjointClasses, DisjointUnion, EquivalentClasses, EquivalentObjectProperties, NamedIndividual, ObjectProperty, ObjectPropertyDomain, ObjectPropertyExpression, SubObjectPropertyExpression, SubObjectPropertyOf, TransitiveObjectProperty, Individual, ObjectPropertyAssertion, AnonymousIndividual, DataProperty, DataRange, Datatype, Literal, FacetRestriction, Facet, ReflexiveObjectProperty, IrreflexiveObjectProperty, SymmetricObjectProperty, AsymmetricObjectProperty, ObjectPropertyRange, InverseObjectProperties, FunctionalObjectProperty, InverseFunctionalObjectProperty, DisjointObjectProperties};
+use horned_owl::model::{Axiom, Build, Class, SubClassOf, ClassAssertion, ClassExpression, DeclareClass, DeclareObjectProperty, DeclareDatatype, DeclareDataProperty, DeclareNamedIndividual, DisjointClasses, DisjointUnion, EquivalentClasses, EquivalentObjectProperties, NamedIndividual, ObjectProperty, ObjectPropertyDomain, ObjectPropertyExpression, SubObjectPropertyExpression, SubObjectPropertyOf, TransitiveObjectProperty, Individual, ObjectPropertyAssertion, AnonymousIndividual, DataProperty, DataRange, Datatype, Literal, FacetRestriction, Facet, ReflexiveObjectProperty, IrreflexiveObjectProperty, SymmetricObjectProperty, AsymmetricObjectProperty, ObjectPropertyRange, InverseObjectProperties, FunctionalObjectProperty, InverseFunctionalObjectProperty, DisjointObjectProperties, Import, SubDataPropertyOf, EquivalentDataProperties, DisjointDataProperties, DataPropertyDomain, DataPropertyRange, FunctionalDataProperty, DatatypeDefinition, HasKey, SameIndividual, DifferentIndividuals, NegativeObjectPropertyAssertion, DataPropertyAssertion, NegativeDataPropertyAssertion};
 
 
 pub fn translate(axiom : &Axiom) -> Value {
 
     match axiom {
         Axiom::OntologyAnnotation(x) => json!("[TODO ontology annotation]"),
-        Axiom::Import(x) => json!("[TODO import]"),
+        Axiom::Import(x) => translate_import(x),
 
         Axiom::DeclareClass(x) => translate_class_declaration(x),
         Axiom::DeclareObjectProperty(x) => translate_object_property_declaration(x),
@@ -36,26 +36,26 @@ pub fn translate(axiom : &Axiom) -> Value {
         Axiom::AsymmetricObjectProperty(x) => translate_asymmetric_object_property(x),
         Axiom::TransitiveObjectProperty(x) => translate_transitive_object_property(x),
 
-        Axiom::SubDataPropertyOf(x) => json!("[TODO sub data property]"),
-        Axiom::EquivalentDataProperties(x) => json!("[TODO equivalent data property]"),
-        Axiom::DisjointDataProperties(x) => json!("[TODO disjoint data property]"),
-        Axiom::DataPropertyDomain(x) => json!("[TODO data property domain]"),
-        Axiom::DataPropertyRange(x) => json!("[TODO data property range]"),
-        Axiom::FunctionalDataProperty(x) => json!("[TODO functional data property]"),
+        Axiom::SubDataPropertyOf(x) => translate_sub_data_property_of(x),
+        Axiom::EquivalentDataProperties(x) => translate_equivalent_data_properties(x),
+        Axiom::DisjointDataProperties(x) => translate_disjoint_data_properties(x),
+        Axiom::DataPropertyDomain(x) => translate_data_property_domain(x),
+        Axiom::DataPropertyRange(x) => translate_data_property_range(x),
+        Axiom::FunctionalDataProperty(x) => translate_functional_data_property(x),
 
-        Axiom::DatatypeDefinition(x) => json!("[TODO data type definition]"),
-        Axiom::HasKey(x) => json!("[TODO has key]"),
+        Axiom::DatatypeDefinition(x) => translate_datatype_definition(x),
+        Axiom::HasKey(x) => translate_has_key(x),
 
-        Axiom::SameIndividual(x) => json!("[TODO same individual]"),
-        Axiom::DifferentIndividuals(x) => json!("[TODO different individuals]"),
+        Axiom::SameIndividual(x) => translate_same_individual(x),
+        Axiom::DifferentIndividuals(x) => translate_different_individuals(x),
 
-        Axiom::ClassAssertion(x) => json!("[TODO class assertion]"),
-        Axiom::ObjectPropertyAssertion(x) => json!("[TODO object property assertion]"),
-        Axiom::NegativeObjectPropertyAssertion(x) => json!("[TODO negative object property assertion]"),
-        Axiom::DataPropertyAssertion(x) => json!("[TODO data property assertion]"),
-        Axiom::NegativeDataPropertyAssertion(x) => json!("[TODO negative data property assertion]"),
-        Axiom::AnnotationAssertion(x) => json!("[TODO annotation assertion]"),
+        Axiom::ClassAssertion(x) => translate_class_assertion(x),
+        Axiom::ObjectPropertyAssertion(x) => translate_object_property_assertion(x),
+        Axiom::NegativeObjectPropertyAssertion(x) => translate_negative_object_property_assertion(x),
+        Axiom::DataPropertyAssertion(x) => translate_data_property_assertion(x),
+        Axiom::NegativeDataPropertyAssertion(x) => translate_negative_data_property_assertion(x),
 
+        Axiom::AnnotationAssertion(x) => json!("[TODO annotation assertion]"), 
         Axiom::SubAnnotationPropertyOf(x) => json!("[TODO sub annotation property of]"), 
         Axiom::AnnotationPropertyDomain(x) => json!("[TODO annotation property domain]"),
         Axiom::AnnotationPropertyRange(x) => json!("[TODO annotation property range]"), 
@@ -108,7 +108,7 @@ pub fn translate_equivalent_classes(axiom : &EquivalentClasses) -> Value {
 pub fn translate_object_property_axiom(operator : &str, property : &ObjectPropertyExpression) -> Value {
 
     let operator = Value::String(String::from(operator));
-    let argument = expression_transducer::translate_property_expression(property);
+    let argument = expression_transducer::translate_object_property_expression(property);
 
     let mut res = vec![operator];
     res.push(argument);
@@ -144,7 +144,7 @@ pub fn translate_inverse_functional_object_property(axiom : &InverseFunctionalOb
 }
 
 pub fn translate_object_property_domain(axiom : &ObjectPropertyDomain) -> Value {
-    let property = expression_transducer::translate_property_expression(&axiom.ope.clone());
+    let property = expression_transducer::translate_object_property_expression(&axiom.ope.clone());
     let domain = expression_transducer::translate_class_expression(&axiom.ce.clone());
 
     let operator = Value::String(String::from("ObjectPropertyDomain"));
@@ -158,7 +158,7 @@ pub fn translate_object_property_domain(axiom : &ObjectPropertyDomain) -> Value 
 pub fn translate_object_property_range(axiom : &ObjectPropertyRange) -> Value {
 
     let operator = Value::String(String::from("ObjectPropertyRange"));
-    let property = expression_transducer::translate_property_expression(&axiom.ope.clone());
+    let property = expression_transducer::translate_object_property_expression(&axiom.ope.clone());
     let domain = expression_transducer::translate_class_expression(&axiom.ce.clone()); 
 
     let mut res = vec![operator];
@@ -184,7 +184,7 @@ pub fn translate_disjoint_object_properties(axiom : &DisjointObjectProperties) -
 
     let arguments = axiom.0.clone();
     let mut operands : Vec<Value> = arguments.into_iter()
-                                         .map(|x| expression_transducer::translate_property_expression(&x))
+                                         .map(|x| expression_transducer::translate_object_property_expression(&x))
                                          .collect(); 
     operands.insert(0,operator);
     Value::Array(operands) 
@@ -195,7 +195,7 @@ pub fn translate_equivalent_object_properties(axiom : &EquivalentObjectPropertie
 
     let arguments = axiom.0.clone();
     let mut operands : Vec<Value> = arguments.into_iter()
-                                         .map(|x| expression_transducer::translate_property_expression(&x))
+                                         .map(|x| expression_transducer::translate_object_property_expression(&x))
                                          .collect(); 
     operands.insert(0,operator);
     Value::Array(operands) 
@@ -205,7 +205,7 @@ pub fn translate_sub_object_property(axiom : &SubObjectPropertyOf) -> Value {
     let operator = Value::String(String::from("SubObjectPropertyOf"));
     let lhs = expression_transducer::translate_sub_object_property_expression(&axiom.sub);
 
-    let rhs = expression_transducer::translate_property_expression(&axiom.sup); 
+    let rhs = expression_transducer::translate_object_property_expression(&axiom.sup); 
 
     let v = vec![operator, lhs, rhs];
     Value::Array(v) 
@@ -266,6 +266,167 @@ pub fn translate_datatype_declaration(axiom : &DeclareDatatype) -> Value {
     let v = vec![operator, property];
     let v =  Value::Array(v);
     wrap_declaration(&v) 
+}
+
+pub fn translate_import(axiom : &Import) -> Value {
+    let operator = Value::String(String::from("Import"));
+    let a = json!(axiom.0.get(0..));
+    let v = vec![operator, a];
+    Value::Array(v)
+}
+
+pub fn translate_sub_data_property_of(axiom : &SubDataPropertyOf) -> Value {
+
+    let operator = Value::String(String::from("SubDataPropertyOf"));
+    let sub = expression_transducer::translate_data_property(&axiom.sub);
+    let sup = expression_transducer::translate_data_property(&axiom.sup);
+
+    let v = vec![operator, sub, sup];
+    Value::Array(v) 
+}
+
+pub fn translate_equivalent_data_properties(axiom : &EquivalentDataProperties) -> Value {
+
+    let operator = Value::String(String::from("EquivalentDataProperties"));
+    let arguments = axiom.0.clone();
+    let mut operands : Vec<Value> = arguments.into_iter()
+                                         .map(|x| expression_transducer::translate_data_property(&x))
+                                         .collect(); 
+    operands.insert(0,operator);
+    Value::Array(operands) 
+}
+
+pub fn translate_disjoint_data_properties(axiom : &DisjointDataProperties) -> Value {
+
+    let operator = Value::String(String::from("DisjointDataProperties"));
+    let arguments = axiom.0.clone();
+    let mut operands : Vec<Value> = arguments.into_iter()
+                                         .map(|x| expression_transducer::translate_data_property(&x))
+                                         .collect(); 
+    operands.insert(0,operator);
+    Value::Array(operands) 
+}
+
+pub fn translate_data_property_domain(axiom : &DataPropertyDomain) -> Value {
+
+    let operator = Value::String(String::from("DataPropertyDomain"));
+    let property = expression_transducer::translate_data_property(&axiom.dp);
+    let domain = expression_transducer::translate_class_expression(&axiom.ce);
+
+    let v = vec![operator, property, domain];
+    Value::Array(v) 
+}
+
+pub fn translate_data_property_range(axiom : &DataPropertyRange) -> Value {
+
+    let operator = Value::String(String::from("DataPropertyRange"));
+    let property = expression_transducer::translate_data_property(&axiom.dp);
+    let range = expression_transducer::translate_data_range(&axiom.dr);
+
+    let v = vec![operator, property, range];
+    Value::Array(v) 
+}
+
+pub fn translate_functional_data_property(axiom : &FunctionalDataProperty) -> Value {
+
+    let operator = Value::String(String::from("FunctionalDataProperty"));
+    let property = expression_transducer::translate_data_property(&axiom.0);
+
+    let v = vec![operator, property];
+    Value::Array(v) 
+}
+
+pub fn translate_datatype_definition(axiom : &DatatypeDefinition) -> Value {
+
+    let operator = Value::String(String::from("DatatypeDefinition"));
+    let datatype = expression_transducer::translate_datatype(&axiom.kind);
+    let range = expression_transducer::translate_data_range(&axiom.range);
+
+    let v = vec![operator, datatype, range];
+    Value::Array(v) 
+}
+
+pub fn translate_has_key(axiom : &HasKey) -> Value {
+    let operator = Value::String(String::from("HasKey"));
+    let ce = expression_transducer::translate_class_expression(&axiom.ce);
+    let properties = axiom.vpe.clone();
+
+    let mut operands : Vec<Value> = properties.into_iter()
+                                         .map(|x| expression_transducer::translate_property_expression(&x))
+                                         .collect(); 
+
+    operands.insert(0,ce);
+    operands.insert(0,operator);
+    Value::Array(operands) 
+}
+
+pub fn translate_same_individual(axiom : &SameIndividual) -> Value {
+    let operator = Value::String(String::from("SameIndividual"));
+    let individuals = axiom.0.clone();
+    let mut operands : Vec<Value> = individuals.into_iter()
+                                         .map(|x| expression_transducer::translate_individual(&x))
+                                         .collect(); 
+    operands.insert(0,operator);
+    Value::Array(operands) 
+}
+
+pub fn translate_different_individuals(axiom : &DifferentIndividuals) -> Value {
+    let operator = Value::String(String::from("DifferentIndividuals"));
+    let individuals = axiom.0.clone();
+    let mut operands : Vec<Value> = individuals.into_iter()
+                                         .map(|x| expression_transducer::translate_individual(&x))
+                                         .collect(); 
+    operands.insert(0,operator);
+    Value::Array(operands) 
+}
+
+pub fn translate_class_assertion(axiom : &ClassAssertion) -> Value {
+    let operator = Value::String(String::from("ClassAssertion"));
+    let individual = expression_transducer::translate_individual(&axiom.i);
+    let class = expression_transducer::translate_class_expression(&axiom.ce);
+
+    let v = vec![operator, class, individual];
+    Value::Array(v) 
+}
+
+pub fn translate_object_property_assertion(axiom : &ObjectPropertyAssertion) -> Value {
+    let operator = Value::String(String::from("ObjectPropertyAssertion"));
+    let from = expression_transducer::translate_individual(&axiom.from);
+    let to = expression_transducer::translate_individual(&axiom.to);
+    let property = expression_transducer::translate_object_property_expression(&axiom.ope);
+
+    let v = vec![operator, property, from, to];
+    Value::Array(v) 
+}
+
+pub fn translate_negative_object_property_assertion(axiom : &NegativeObjectPropertyAssertion) -> Value {
+    let operator = Value::String(String::from("NegativeObjectPropertyAssertion"));
+    let from = expression_transducer::translate_individual(&axiom.from);
+    let to = expression_transducer::translate_individual(&axiom.to);
+    let property = expression_transducer::translate_object_property_expression(&axiom.ope);
+
+    let v = vec![operator, property, from, to];
+    Value::Array(v) 
+}
+
+pub fn translate_data_property_assertion(axiom : &DataPropertyAssertion) -> Value {
+    let operator = Value::String(String::from("DataPropertyAssertion"));
+    let from = expression_transducer::translate_individual(&axiom.from);
+    let to = expression_transducer::translate_literal(&axiom.to);
+    let property = expression_transducer::translate_data_property(&axiom.dp);
+
+    let v = vec![operator, property, from, to];
+    Value::Array(v) 
+}
+
+pub fn translate_negative_data_property_assertion(axiom : &NegativeDataPropertyAssertion) -> Value {
+    let operator = Value::String(String::from("NegativeDataPropertyAssertion"));
+    let from = expression_transducer::translate_individual(&axiom.from);
+    let to = expression_transducer::translate_literal(&axiom.to);
+    let property = expression_transducer::translate_data_property(&axiom.dp);
+
+    let v = vec![operator, property, from, to];
+    Value::Array(v) 
 }
 
 
