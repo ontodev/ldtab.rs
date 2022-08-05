@@ -2,6 +2,8 @@ use serde_json::{Value};
 use serde_json::json; 
 use crate::owl2ofn::expression_transducer as expression_transducer;
 use horned_owl::model::{Annotation, AnnotationProperty, AnnotationValue, AnnotationSubject};
+use std::collections::BTreeSet;
+
 
 
 pub fn translate_annotation(annotation : &Annotation) -> Value {
@@ -29,4 +31,13 @@ pub fn translate_annotation_value(value : &AnnotationValue) -> Value {
         AnnotationValue::Literal(x) => expression_transducer::translate_literal(x),
         AnnotationValue::IRI(x) => json!(x.get(0..)),
     } 
+}
+
+pub fn translate_annotation_set(annotation_set : &BTreeSet<Annotation>) -> Value {
+        let operator = Value::String(String::from("AnnotationList"));//NB: not OWL
+        let mut res = vec![operator];
+        for annotation in annotation_set {
+            res.push(translate_annotation(annotation));
+        } 
+        Value::Array(res) 
 }
