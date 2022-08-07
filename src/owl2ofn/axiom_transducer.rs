@@ -434,9 +434,10 @@ pub fn translate_annotation_assertion(axiom : &AnnotationAssertion) -> Value {
 
     let operator = Value::String(String::from("AnnotationAssertion"));
     let subject = annotation_transducer::translate_annotation_subject(&axiom.subject);
-    let annotation = annotation_transducer::translate_annotation(&axiom.ann);
+    let property = annotation_transducer::translate_annotation_property(&axiom.ann.ap);
+    let value = annotation_transducer::translate_annotation_value(&axiom.ann.av);
 
-    let v = vec![operator, subject, annotation];
+    let v = vec![operator, subject, property, value];
     Value::Array(v) 
 }
 
