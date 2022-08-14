@@ -69,9 +69,10 @@ pub fn translate_individual(individual : &Individual) -> Value {
 
 pub fn translate_literal(literal : &Literal) -> Value { 
         match literal {
-            Literal::Simple{literal} => json!(literal),
-            Literal::Language{literal, lang} => json!(format!("{}@{}", literal, lang)),
-            Literal::Datatype{literal, datatype_iri} => json!(format!("{}^^{}", literal, datatype_iri.get(0..).unwrap()))
+            //we need to use double quotes here to mark a string as a literal
+            Literal::Simple{literal} => json!(format!("\"{}\"",literal)),
+            Literal::Language{literal, lang} => json!(format!("\"{}\"@{}", literal, lang)),
+            Literal::Datatype{literal, datatype_iri} => json!(format!("\"{}\"^^{}", literal, datatype_iri.get(0..).unwrap()))
         }
 }
 
