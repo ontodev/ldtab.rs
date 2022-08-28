@@ -1,4 +1,5 @@
 use serde_json::{Value};
+use regex::Regex;
 use horned_owl::model::{Build, Class, ClassExpression,  NamedIndividual, ObjectProperty, ObjectPropertyExpression, SubObjectPropertyExpression, Individual, AnonymousIndividual, DataProperty, DataRange, Datatype, Literal, FacetRestriction, Facet, PropertyExpression};
 
 
@@ -61,9 +62,42 @@ pub fn translate_class_expression(v : &Value) -> ClassExpression {
      }
 } 
 
+pub fn translate_literal_string(s: &str) -> Literal {
+
+    let b = Build::new();
+
+    let simple = Regex::new("^\"(.+)\"$").unwrap();
+    let language_tag = Regex::new("^\"(.+)\"@(.*)$").unwrap();
+    let datatype = Regex::new("^\"(.+)\"\\^\\^(.*)$").unwrap();
+
+    if language_tag.is_match(s) {
+        match language_tag.captures(s) {
+            Some(x) => Literal::Language{ literal: String::from(&x[1]),
+                                          lang: String::from(&x[2]) },
+            None => panic!("Not a literal with a language tag")
+        } 
+    } else if datatype.is_match(s) { 
+        match datatype.captures(s){
+            Some(x) => Literal::Datatype{literal: String::from(&x[1]),
+                                        datatype_iri: b.iri(&x[2]),},
+            None => panic!("Not a literal with a datatype")
+
+        } 
+    } else if simple.is_match(s) { 
+        match simple.captures(s) {
+            Some(x) => Literal::Simple{literal: String::from(&x[1])},
+            None => panic!("Not a simple literal")
+        }
+    } else { 
+        panic!()
+    }
+}
+
 pub fn translate_literal(v: &Value) -> Literal {
-    //TODO 
-    panic!() 
+    match v.as_str() {
+        Some(x) => translate_literal_string(x),
+        None => panic!() 
+    }
 }
 
 pub fn translate_data_range(v : &Value) -> DataRange {
