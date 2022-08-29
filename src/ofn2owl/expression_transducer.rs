@@ -1,11 +1,10 @@
 use serde_json::{Value};
 use regex::Regex;
+use std::rc::Rc; 
 use horned_owl::model::{Build, Class, ClassExpression,  NamedIndividual, ObjectProperty, ObjectPropertyExpression, SubObjectPropertyExpression, Individual, AnonymousIndividual, DataProperty, DataRange, Datatype, Literal, FacetRestriction, Facet, PropertyExpression};
 
 
- //Class | ObjectIntersectionOf | ObjectUnionOf | ObjectComplementOf | ObjectOneOf | ObjectSomeValuesFrom | ObjectAllValuesFrom | ObjectHasValue | ObjectHasSelf | ObjectMinCardinality | ObjectMaxCardinality | ObjectExactCardinality | DataSomeValuesFrom | DataAllValuesFrom | DataHasValue | DataMinCardinality | DataMaxCardinality | DataExactCardinality
- //
-pub fn translate_property_expression(v : &Value) -> ObjectPropertyExpression {
+pub fn translate_object_property_expression(v : &Value) -> ObjectPropertyExpression {
      match v[0].as_str() {
          Some("InverseOf") => translate_inverse_of(v), 
          None => translate_named_object_property(v),
@@ -13,9 +12,25 @@ pub fn translate_property_expression(v : &Value) -> ObjectPropertyExpression {
      } 
 }
 
+pub fn translate_sub_object_property_expression(v : &Value) -> SubObjectPropertyExpression {
+    match v.as_array() {
+        Some(array) => { if array.len() == 2 {
+            let property = translate_object_property_expression(&v[1]);
+            SubObjectPropertyExpression::ObjectPropertyExpression(property)
+        } else { 
+            let operands: Vec<ObjectPropertyExpression> = (&(v.as_array().unwrap())[1..])
+                .into_iter()
+                .map(|x| translate_object_property_expression(&x))
+                .collect(); 
+            SubObjectPropertyExpression::ObjectPropertyChain(operands)
+        }
+        },
+        None => panic!()
+    } 
+}
+
 pub fn translate_class_expression(v : &Value) -> ClassExpression { 
      match v[0].as_str() {
-         //throw an error for ambiguity
          //Some("SomeValuesFrom") => translate_some_values_from(v), 
          //Some("AllValuesFrom") => translate_all_values_from(v), 
          //Some("HasValue") => translate_has_value(v), 
@@ -57,7 +72,7 @@ pub fn translate_class_expression(v : &Value) -> ClassExpression {
          Some("DataExactCardinality") => translate_data_exact_cardinality(v), 
          Some("DataExactQualifiedCardinality") => translate_data_exact_qualified_cardinality(v), 
 
-         Some(_) => panic!(),
+         Some(_) => panic!("Not a valid (typed) OFN S-expression"),
          None => translate_named_class(v),
      }
 } 
@@ -206,6 +221,19 @@ pub fn translate_named_class(v : &Value) -> ClassExpression {
     b.class(iri).into()
 }
 
+pub fn translate_anonymous_individual(v : &Value) -> AnonymousIndividual {
+
+    let name = match v {
+        Value::String(x) => x,
+        _ => panic!("Not a named entity"), 
+    }; 
+
+    let s = name.as_str();
+    let rc : Rc<str> = Rc::from(s);
+
+    AnonymousIndividual{0: rc} 
+}
+
 pub fn translate_individual(v : &Value) -> Individual {
 
     //TODO: handle anonymous individuals
@@ -222,7 +250,7 @@ pub fn translate_individual(v : &Value) -> Individual {
 
 pub fn translate_object_some_values_from(v : &Value) -> ClassExpression {
 
-    let property = translate_property_expression(&v[1]); 
+    let property = translate_object_property_expression(&v[1]); 
     let filler: ClassExpression = translate_class_expression(&v[2]); 
 
     ClassExpression::ObjectSomeValuesFrom {
@@ -233,7 +261,7 @@ pub fn translate_object_some_values_from(v : &Value) -> ClassExpression {
 
 pub fn translate_object_all_values_from(v : &Value) -> ClassExpression {
 
-    let property = translate_property_expression(&v[1]); 
+    let property = translate_object_property_expression(&v[1]); 
     let filler: ClassExpression = translate_class_expression(&v[2]); 
 
     ClassExpression::ObjectAllValuesFrom {
@@ -244,7 +272,7 @@ pub fn translate_object_all_values_from(v : &Value) -> ClassExpression {
 
 pub fn translate_object_has_value(v : &Value) -> ClassExpression {
 
-    let property = translate_property_expression(&v[1]); 
+    let property = translate_object_property_expression(&v[1]); 
     let individual: Individual = translate_individual(&v[2]); 
 
     ClassExpression::ObjectHasValue {
@@ -266,7 +294,7 @@ pub fn translate_object_min_cardinality(v : &Value) -> ClassExpression {
         _ => panic!("Not a named entity"), 
     }; 
 
-    let property = translate_property_expression(&v[2]); 
+    let property = translate_object_property_expression(&v[2]); 
     let filler: ClassExpression = b.class("http://www.w3.org/2002/07/owl#Thing").into();
 
     ClassExpression::ObjectMinCardinality {
@@ -288,7 +316,7 @@ pub fn translate_object_min_qualified_cardinality(v : &Value) -> ClassExpression
         _ => panic!("Not a named entity"), 
     }; 
 
-    let property = translate_property_expression(&v[2]); 
+    let property = translate_object_property_expression(&v[2]); 
     let filler: ClassExpression = translate_class_expression(&v[3]); 
 
     ClassExpression::ObjectMinCardinality {
@@ -312,7 +340,7 @@ pub fn translate_object_max_cardinality(v : &Value) -> ClassExpression {
         _ => panic!("Not a named entity"), 
     }; 
 
-    let property = translate_property_expression(&v[2]); 
+    let property = translate_object_property_expression(&v[2]); 
     let filler: ClassExpression = b.class("http://www.w3.org/2002/07/owl#Thing").into();
 
     ClassExpression::ObjectMaxCardinality {
@@ -334,7 +362,7 @@ pub fn translate_object_max_qualified_cardinality(v : &Value) -> ClassExpression
         _ => panic!("Not a named entity"), 
     }; 
 
-    let property = translate_property_expression(&v[2]); 
+    let property = translate_object_property_expression(&v[2]); 
     let filler: ClassExpression = translate_class_expression(&v[3]); 
 
     ClassExpression::ObjectMaxCardinality {
@@ -359,7 +387,7 @@ pub fn translate_object_exact_cardinality(v : &Value) -> ClassExpression {
         _ => panic!("Not a named entity"), 
     }; 
 
-    let property = translate_property_expression(&v[2]); 
+    let property = translate_object_property_expression(&v[2]); 
     let filler: ClassExpression = b.class("http://www.w3.org/2002/07/owl#Thing").into();
 
     ClassExpression::ObjectExactCardinality {
@@ -381,7 +409,7 @@ pub fn translate_object_exact_qualified_cardinality(v : &Value) -> ClassExpressi
         _ => panic!("Not a named entity"), 
     }; 
 
-    let property = translate_property_expression(&v[2]); 
+    let property = translate_object_property_expression(&v[2]); 
     let filler: ClassExpression = translate_class_expression(&v[3]); 
 
     ClassExpression::ObjectExactCardinality {
@@ -393,7 +421,7 @@ pub fn translate_object_exact_qualified_cardinality(v : &Value) -> ClassExpressi
 
 pub fn translate_object_has_self(v : &Value) -> ClassExpression { 
 
-    let property = translate_property_expression(&v[1]); 
+    let property = translate_object_property_expression(&v[1]); 
     ClassExpression::ObjectHasSelf(property) 
 }
 
