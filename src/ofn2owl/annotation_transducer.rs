@@ -5,6 +5,14 @@ use crate::ofn2owl::expression_transducer as expression_transducer;
 use crate::ofn2owl::util as util;
 use std::collections::BTreeSet;
 
+pub fn translate_annotation(v : &Value) -> Annotation {
+    let property = translate_annotation_property(&v[1]);
+    let value = translate_annotation_value(&v[2]);
+    let annotation = Annotation{ap : property,
+                                av : value};
+    annotation 
+}
+
 pub fn translate_annotation_property(v : &Value) -> AnnotationProperty {
     let b = Build::new();
 
