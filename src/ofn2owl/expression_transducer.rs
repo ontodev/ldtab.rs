@@ -50,12 +50,23 @@ pub fn translate_class_expression(v : &Value) -> ClassExpression {
          Some("ObjectSomeValuesFrom") => translate_object_some_values_from(v), 
          Some("ObjectAllValuesFrom") => translate_object_all_values_from(v), 
          Some("ObjectHasValue") => translate_object_has_value(v), 
+
          Some("ObjectMinCardinality") => translate_object_min_cardinality(v), 
-         Some("ObjectMinQualifiedCardinality") => translate_object_min_qualified_cardinality(v), 
          Some("ObjectMaxCardinality") => translate_object_max_cardinality(v), 
-         Some("ObjectMaxQualifiedCardinality") => translate_object_max_qualified_cardinality(v), 
          Some("ObjectExactCardinality") => translate_object_exact_cardinality(v), 
+
+         Some("DataMinCardinality") => translate_data_min_cardinality(v), 
+         Some("DataMaxCardinality") => translate_data_max_cardinality(v), 
+         Some("DataExactCardinality") => translate_data_exact_cardinality(v), 
+
+         //TODO: deprecate these
+         Some("ObjectMinQualifiedCardinality") => translate_object_min_qualified_cardinality(v), 
+         Some("ObjectMaxQualifiedCardinality") => translate_object_max_qualified_cardinality(v), 
          Some("ObjectExactQualifiedCardinality") => translate_object_exact_qualified_cardinality(v), 
+         Some("DataMinQualifiedCardinality") => translate_data_min_qualified_cardinality(v), 
+         Some("DataMaxQualifiedCardinality") => translate_data_max_qualified_cardinality(v), 
+         Some("DataExactQualifiedCardinality") => translate_data_exact_qualified_cardinality(v), 
+
          Some("ObjectHasSelf") => translate_object_has_self(v), 
          Some("ObjectIntersectionOf") => translate_object_intersection_of(v), 
          Some("ObjectUnionOf") => translate_object_union_of(v), 
@@ -65,12 +76,7 @@ pub fn translate_class_expression(v : &Value) -> ClassExpression {
          Some("DataSomeValuesFrom") => translate_data_some_values_from(v), 
          Some("DataAllValuesFrom") => translate_data_all_values_from(v), 
          Some("DataHasValue") => translate_data_has_value(v), 
-         Some("DataMinCardinality") => translate_data_min_cardinality(v), 
-         Some("DataMinQualifiedCardinality") => translate_data_min_qualified_cardinality(v), 
-         Some("DataMaxCardinality") => translate_data_max_cardinality(v), 
-         Some("DataMaxQualifiedCardinality") => translate_data_max_qualified_cardinality(v), 
-         Some("DataExactCardinality") => translate_data_exact_cardinality(v), 
-         Some("DataExactQualifiedCardinality") => translate_data_exact_qualified_cardinality(v), 
+
 
          Some(_) => panic!("Not a valid (typed) OFN S-expression"),
          None => translate_named_class(v),
@@ -81,9 +87,9 @@ pub fn translate_literal_string(s: &str) -> Literal {
 
     let b = Build::new();
 
-    let simple = Regex::new("^\"(.+)\"$").unwrap();
-    let language_tag = Regex::new("^\"(.+)\"@(.*)$").unwrap();
-    let datatype = Regex::new("^\"(.+)\"\\^\\^(.*)$").unwrap();
+    let simple = Regex::new("(?s)^\"(.+)\"$").unwrap();
+    let language_tag = Regex::new("(?s)^\"(.+)\"@(.*)$").unwrap();
+    let datatype = Regex::new("^(?s)\"(.+)\"\\^\\^(.*)$").unwrap();
 
     if language_tag.is_match(s) {
         match language_tag.captures(s) {
@@ -300,7 +306,18 @@ pub fn translate_object_min_cardinality(v : &Value) -> ClassExpression {
     }; 
 
     let property = translate_object_property_expression(&v[2]); 
-    let filler: ClassExpression = b.class("http://www.w3.org/2002/07/owl#Thing").into();
+
+    let ofn = v.as_array().unwrap();
+    let is_qualified = ofn.len() == 4;
+   
+    let filler = 
+    if is_qualified {
+        translate_class_expression(&v[3])
+    } else {
+        b.class("http://www.w3.org/2002/07/owl#Thing").into()
+    };
+
+    //let filler: ClassExpression = b.class("http://www.w3.org/2002/07/owl#Thing").into();
 
     ClassExpression::ObjectMinCardinality {
         n : cardinality as u32,
@@ -342,7 +359,18 @@ pub fn translate_object_max_cardinality(v : &Value) -> ClassExpression {
     }; 
 
     let property = translate_object_property_expression(&v[2]); 
-    let filler: ClassExpression = b.class("http://www.w3.org/2002/07/owl#Thing").into();
+
+    let ofn = v.as_array().unwrap();
+    let is_qualified = ofn.len() == 4;
+   
+    let filler = 
+    if is_qualified {
+        translate_class_expression(&v[3])
+    } else {
+        b.class("http://www.w3.org/2002/07/owl#Thing").into()
+    };
+
+    //let filler: ClassExpression = b.class("http://www.w3.org/2002/07/owl#Thing").into();
 
     ClassExpression::ObjectMaxCardinality {
         n : cardinality as u32,
@@ -385,7 +413,18 @@ pub fn translate_object_exact_cardinality(v : &Value) -> ClassExpression {
     }; 
 
     let property = translate_object_property_expression(&v[2]); 
-    let filler: ClassExpression = b.class("http://www.w3.org/2002/07/owl#Thing").into();
+
+    let ofn = v.as_array().unwrap();
+    let is_qualified = ofn.len() == 4;
+   
+    let filler = 
+    if is_qualified {
+        translate_class_expression(&v[3])
+    } else {
+        b.class("http://www.w3.org/2002/07/owl#Thing").into()
+    };
+
+    //let filler: ClassExpression = b.class("http://www.w3.org/2002/07/owl#Thing").into();
 
     ClassExpression::ObjectExactCardinality {
         n : cardinality as u32,
@@ -505,7 +544,19 @@ pub fn translate_data_min_cardinality(v : &Value) -> ClassExpression {
     }; 
 
     let property = translate_data_property(&v[2]); 
-    let filler: DataRange = DataRange::Datatype(b.datatype("rdfs:Literal"));
+
+    let ofn = v.as_array().unwrap();
+    let is_qualified = ofn.len() == 4;
+   
+    let filler = 
+    if is_qualified {
+        translate_data_range(&v[3])
+    } else {
+        DataRange::Datatype(b.datatype("rdfs:Literal"))
+    };
+
+
+    //let filler: DataRange = DataRange::Datatype(b.datatype("rdfs:Literal"));
 
     ClassExpression::DataMinCardinality {
         n : cardinality as u32,
@@ -551,7 +602,17 @@ pub fn translate_data_max_cardinality(v : &Value) -> ClassExpression {
     }; 
 
     let property = translate_data_property(&v[2]); 
-    let filler: DataRange = DataRange::Datatype(b.datatype("rdfs:Literal"));
+    //let filler: DataRange = DataRange::Datatype(b.datatype("rdfs:Literal"));
+
+    let ofn = v.as_array().unwrap();
+    let is_qualified = ofn.len() == 4;
+   
+    let filler = 
+    if is_qualified {
+        translate_data_range(&v[3])
+    } else {
+        DataRange::Datatype(b.datatype("rdfs:Literal"))
+    };
 
     ClassExpression::DataMaxCardinality {
         n : cardinality as u32,
@@ -597,7 +658,16 @@ pub fn translate_data_exact_cardinality(v : &Value) -> ClassExpression {
     }; 
 
     let property = translate_data_property(&v[2]); 
-    let filler: DataRange = DataRange::Datatype(b.datatype("rdfs:Literal"));
+
+    let ofn = v.as_array().unwrap();
+    let is_qualified = ofn.len() == 4;
+    //let filler: DataRange = DataRange::Datatype(b.datatype("rdfs:Literal")); 
+    let filler = 
+    if is_qualified {
+        translate_data_range(&v[3])
+    } else {
+        DataRange::Datatype(b.datatype("rdfs:Literal"))
+    };
 
     ClassExpression::DataExactCardinality {
         n : cardinality as u32,
