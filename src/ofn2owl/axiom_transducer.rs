@@ -56,7 +56,7 @@ pub fn translate_axiom(v : &Value) -> Axiom {
         Some("AnnotationAssertion") => translate_annotation_assertion(v),
         Some("SubAnnotationPropertyOf") => translate_sub_annotation_assertion(v),
         Some("AnnotationPropertyDomain") => translate_annotation_property_domain(v),
-        Some("AnnotationPropertyRange") => translate_annotation_property_domain(v),
+        Some("AnnotationPropertyRange") => translate_annotation_property_range(v),
 
         Some(_) => panic!("Not a valid OWL axiom operator"), 
         None => panic!("Not a valid (typed) OFN S-expression"), 
