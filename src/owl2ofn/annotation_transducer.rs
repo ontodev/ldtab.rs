@@ -33,11 +33,20 @@ pub fn translate_annotation_value(value : &AnnotationValue) -> Value {
     } 
 }
 
-pub fn translate_annotation_set(annotation_set : &BTreeSet<Annotation>) -> Value {
-        let operator = Value::String(String::from("AnnotationList"));//NB: not OWL
-        let mut res = vec![operator];
+
+pub fn translate_annotation_set(annotation_set : &BTreeSet<Annotation>) -> Vec<Value> {
+        let mut res = Vec::new();
         for annotation in annotation_set {
             res.push(translate_annotation(annotation));
         } 
-        Value::Array(res) 
+        res
 }
+
+//pub fn translate_annotation_set(annotation_set : &BTreeSet<Annotation>) -> Value {
+//        let operator = Value::String(String::from("AnnotationList"));//NB: not OWL
+//        let mut res = vec![operator];
+//        for annotation in annotation_set {
+//            res.push(translate_annotation(annotation));
+//        } 
+//        Value::Array(res) 
+//}
