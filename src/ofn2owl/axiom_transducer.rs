@@ -219,7 +219,7 @@ pub fn translate_declaration(v : &Value) -> Axiom {
 }
 
 pub fn translate_sub_object_property_of(v : &Value) -> Axiom {
-    let lhs = expression_transducer::translate_sub_object_property_expression(v);
+    let lhs = expression_transducer::translate_sub_object_property_expression(&v[1]);
     let rhs = expression_transducer::translate_object_property_expression(&v[2]);
     let axiom = SubObjectPropertyOf{sub : lhs,
                                     sup: rhs};

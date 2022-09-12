@@ -13,20 +13,20 @@ pub fn translate_object_property_expression(v : &Value) -> ObjectPropertyExpress
 }
 
 pub fn translate_sub_object_property_expression(v : &Value) -> SubObjectPropertyExpression {
-    match v.as_array() {
-        Some(array) => { if array.len() == 2 {
-            let property = translate_object_property_expression(&v[1]);
-            SubObjectPropertyExpression::ObjectPropertyExpression(property)
-        } else { 
-            let operands: Vec<ObjectPropertyExpression> = (&(v.as_array().unwrap())[1..])
+    match v {
+        Value::Array(array) => {
+            let operands: Vec<ObjectPropertyExpression> = (&array[1..])
                 .into_iter()
                 .map(|x| translate_object_property_expression(&x))
                 .collect(); 
             SubObjectPropertyExpression::ObjectPropertyChain(operands)
-        }
         },
-        None => panic!()
-    } 
+        Value::String(_s) => {
+            let property = translate_object_property_expression(v);
+            SubObjectPropertyExpression::ObjectPropertyExpression(property)
+        },
+        _ => panic!()
+    }
 }
 
 pub fn translate_class_expression(v : &Value) -> ClassExpression { 
