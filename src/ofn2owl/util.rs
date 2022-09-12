@@ -23,8 +23,8 @@ pub fn is_anonymous_individual(s : &str) -> bool {
 pub fn is_literal_string(s : &str) -> bool {
 
     //NB: "(?s)" sets a flag so that . matches \n 
-    //let literal = Regex::new("^\"(.+)\"(.*)$").unwrap();
-    let literal = Regex::new("(?s)^\"(.+)\"(.*)$").unwrap();
+    //let literal = Regex::new("^\"(.*)\"(.*)$").unwrap();
+    let literal = Regex::new("(?s)^\"(.*)\"(.*)$").unwrap();
 
     literal.is_match(s) 
 }

@@ -87,9 +87,9 @@ pub fn translate_literal_string(s: &str) -> Literal {
 
     let b = Build::new();
 
-    let simple = Regex::new("(?s)^\"(.+)\"$").unwrap();
-    let language_tag = Regex::new("(?s)^\"(.+)\"@(.*)$").unwrap();
-    let datatype = Regex::new("^(?s)\"(.+)\"\\^\\^(.*)$").unwrap();
+    let simple = Regex::new("(?s)^\"(.*)\"$").unwrap();
+    let language_tag = Regex::new("(?s)^\"(.*)\"@(.*)$").unwrap();
+    let datatype = Regex::new("^(?s)\"(.*)\"\\^\\^(.*)$").unwrap();
 
     if language_tag.is_match(s) {
         match language_tag.captures(s) {
