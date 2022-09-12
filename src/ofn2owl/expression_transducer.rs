@@ -292,11 +292,9 @@ pub fn translate_object_min_cardinality(v : &Value) -> ClassExpression {
     let b = Build::new();
 
     let cardinality = match v[1].clone() {
-        Value::Number(x) => {
-            match x.as_u64() {
-                Some(y) => y,
-                _ => panic!("Not a valid cardinality"), 
-            }
+        Value::String(x) => {
+            let num: i32 = x.parse().unwrap();
+            num 
         }, 
         _ => panic!("Not a named entity"), 
     }; 
@@ -314,11 +312,9 @@ pub fn translate_object_min_cardinality(v : &Value) -> ClassExpression {
 pub fn translate_object_min_qualified_cardinality(v : &Value) -> ClassExpression { 
 
     let cardinality = match v[1].clone() {
-        Value::Number(x) => {
-            match x.as_u64() {
-                Some(y) => y,
-                _ => panic!("Not a valid cardinality"), 
-            }
+        Value::String(x) => {
+            let num: i32 = x.parse().unwrap();
+            num 
         }, 
         _ => panic!("Not a named entity"), 
     }; 
@@ -337,13 +333,11 @@ pub fn translate_object_max_cardinality(v : &Value) -> ClassExpression {
 
     let b = Build::new();
 
-    let cardinality = match v[1].clone() {
-        Value::Number(x) => {
-            match x.as_u64() {
-                Some(y) => y,
-                _ => panic!("Not a valid cardinality"), 
-            }
-        }, 
+    let cardinality = match v[1].clone() { 
+        Value::String(x) => {
+            let num: i32 = x.parse().unwrap();
+            num 
+        },
         _ => panic!("Not a named entity"), 
     }; 
 
@@ -359,13 +353,11 @@ pub fn translate_object_max_cardinality(v : &Value) -> ClassExpression {
 
 pub fn translate_object_max_qualified_cardinality(v : &Value) -> ClassExpression { 
 
-    let cardinality = match v[1].clone() {
-        Value::Number(x) => {
-            match x.as_u64() {
-                Some(y) => y,
-                _ => panic!("Not a valid cardinality"), 
-            }
-        }, 
+    let cardinality = match v[1].clone() { 
+        Value::String(x) => {
+            let num: i32 = x.parse().unwrap();
+            num 
+        },
         _ => panic!("Not a named entity"), 
     }; 
 
@@ -385,12 +377,10 @@ pub fn translate_object_exact_cardinality(v : &Value) -> ClassExpression {
     let b = Build::new();
 
     let cardinality = match v[1].clone() {
-        Value::Number(x) => {
-            match x.as_u64() {
-                Some(y) => y,
-                _ => panic!("Not a valid cardinality"), 
-            }
-        }, 
+        Value::String(x) => {
+            let num: i32 = x.parse().unwrap();
+            num 
+        },
         _ => panic!("Not a named entity"), 
     }; 
 
@@ -407,11 +397,9 @@ pub fn translate_object_exact_cardinality(v : &Value) -> ClassExpression {
 pub fn translate_object_exact_qualified_cardinality(v : &Value) -> ClassExpression { 
 
     let cardinality = match v[1].clone() {
-        Value::Number(x) => {
-            match x.as_u64() {
-                Some(y) => y,
-                _ => panic!("Not a valid cardinality"), 
-            }
+        Value::String(x) => {
+            let num: i32 = x.parse().unwrap();
+            num 
         }, 
         _ => panic!("Not a named entity"), 
     }; 
