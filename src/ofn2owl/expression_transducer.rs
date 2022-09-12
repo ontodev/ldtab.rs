@@ -116,17 +116,24 @@ pub fn translate_literal(v: &Value) -> Literal {
 }
 
 pub fn translate_data_range(v : &Value) -> DataRange {
-     match v[0].as_str() {
-         Some("Datatype") => translate_datatype(v), 
-         Some("DataIntersectionOf") => translate_data_intersection_of(v), 
-         Some("DataUnionOf") => translate_data_union_of(v), 
-         Some("DataComplementOf") => translate_data_complement_of(v), 
-         Some("DataOneOf") => translate_data_one_of(v), 
-         //TODO
-         //Some("DatatypeRestriction") => translate_object_some_values_from(v), 
-         Some(_) => panic!(),
-         None => panic!(),
-     } 
+
+    match v {
+        Value::String(_x) => translate_datatype(v),
+        Value::Array(_x) =>  { 
+            match v[0].as_str() {
+                Some("Datatype") => translate_datatype(v), 
+                Some("DataIntersectionOf") => translate_data_intersection_of(v), 
+                Some("DataUnionOf") => translate_data_union_of(v), 
+                Some("DataComplementOf") => translate_data_complement_of(v), 
+                Some("DataOneOf") => translate_data_one_of(v), 
+                //TODO
+                //Some("DatatypeRestriction") => translate_object_some_values_from(v), 
+                Some(_) => panic!(),
+                None => panic!(),
+            } 
+        } ,
+        _ => panic!(),
+    } 
 }
 
 pub fn translate_data_one_of(v : &Value) -> DataRange { 
