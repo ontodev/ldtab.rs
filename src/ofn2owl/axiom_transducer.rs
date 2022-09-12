@@ -208,12 +208,12 @@ pub fn translate_datatype_declaration(v : &Value) -> Axiom {
 pub fn translate_declaration(v : &Value) -> Axiom {
     let unwrapped_declaration = v[1].clone();
     match unwrapped_declaration[0].as_str() {
-        Some("Class") => translate_class_declaration(v),
-        Some("ObjectProperty") => translate_object_property_declaration(v),
-        Some("DataProperty") => translate_data_property_declaration(v),
-        Some("AnnotationProperty") => translate_annotation_property_declaration(v),
-        Some("NamedIndividual") => translate_named_individual_declaration(v),
-        Some("Datatype") => translate_datatype_declaration(v),
+        Some("Class") => translate_class_declaration(&unwrapped_declaration),
+        Some("ObjectProperty") => translate_object_property_declaration(&unwrapped_declaration),
+        Some("DataProperty") => translate_data_property_declaration(&unwrapped_declaration),
+        Some("AnnotationProperty") => translate_annotation_property_declaration(&unwrapped_declaration),
+        Some("NamedIndividual") => translate_named_individual_declaration(&unwrapped_declaration),
+        Some("Datatype") => translate_datatype_declaration(&unwrapped_declaration),
         _ => panic!()
     }
 }
