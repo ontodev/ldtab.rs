@@ -135,7 +135,7 @@ pub fn translate_object_all_values_from(property : &ObjectPropertyExpression, fi
 
 pub fn translate_object_has_value(property : &ObjectPropertyExpression, value : &Individual ) -> Value {
 
-    let operator = Value::String(String::from("ObjectAllValuesFrom"));
+    let operator = Value::String(String::from("ObjectHasValue"));
     let value = translate_individual(value);
     let property = translate_object_property_expression(property);
 
