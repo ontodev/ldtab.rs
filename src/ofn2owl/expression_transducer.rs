@@ -7,6 +7,7 @@ use horned_owl::model::{Build, Class, ClassExpression,  NamedIndividual, ObjectP
 pub fn translate_object_property_expression(v : &Value) -> ObjectPropertyExpression {
      match v[0].as_str() {
          Some("InverseOf") => translate_inverse_of(v), 
+         Some("ObjectInverseOf") => translate_inverse_of(v), 
          None => translate_named_object_property(v),
          Some(_) => panic!("Incorrect Property Constructor"),
      } 
