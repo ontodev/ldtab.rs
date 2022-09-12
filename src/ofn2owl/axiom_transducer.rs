@@ -45,7 +45,7 @@ pub fn translate_axiom(v : &Value) -> Axiom {
         Some("HasKey") => panic!("HasKey operator currently not supported"),
 
         Some("SameIndividual") => translate_same_individual(v),
-        Some("DifferentIndividual") => translate_different_individuals(v),
+        Some("DifferentIndividuals") => translate_different_individuals(v),
 
         Some("ClassAssertion") => translate_class_assertion(v),
         Some("ObjectPropertyAssertion") => translate_object_property_assertion(v),
