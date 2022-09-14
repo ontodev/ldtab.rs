@@ -4,15 +4,23 @@ use crate::owl2ofn::axiom_transducer as axiom_transducer;
 use crate::owl2ofn::annotation_transducer as annotation_transducer;
 use horned_owl::model::{AnnotatedAxiom, Axiom};
 
-pub fn translate(axiom : &AnnotatedAxiom) -> Value{
+pub fn translate(axiom : &AnnotatedAxiom) -> Value {
 
     let mut logical_axiom = axiom_transducer::translate(&axiom.axiom);
+    let annotations = &axiom.ann;
 
-    if !axiom.ann.is_empty() { 
-        let annotations = annotation_transducer::translate_annotation_set(&axiom.ann); 
+    if !annotations.is_empty() { 
+
+        let annotation_list = annotation_transducer::translate_annotation_set(&axiom.ann); 
+
         let logical_axiom_vec = logical_axiom.as_array_mut().unwrap();
-        logical_axiom_vec.insert(1,annotations);
+
+        for annotation in annotation_list {
+            logical_axiom_vec.insert(1,annotation); 
+        } 
+
         json!(logical_axiom_vec)
+
     } else { 
         logical_axiom
     }
