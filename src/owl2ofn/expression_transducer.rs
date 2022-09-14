@@ -29,8 +29,19 @@ pub fn translate_object_property_expression(expression: &ObjectPropertyExpressio
 
      match expression {
          ObjectPropertyExpression::ObjectProperty(x) => translate_object_property(&x),
-         ObjectPropertyExpression::InverseObjectProperty(x) => translate_object_property(&x),
+         ObjectPropertyExpression::InverseObjectProperty(x) => translate_inverse_object_property(&x),
      } 
+}
+
+pub fn translate_inverse_object_property(property: &ObjectProperty) -> Value {
+
+    let operator = Value::String(String::from("ObjectInverseOf"));
+    let mut res = vec![operator];
+
+    let operand = Value::String(String::from(property.0.get(0..).unwrap()));
+    res.push(operand);
+
+    Value::Array(res) 
 }
 
 pub fn translate_object_property(property: &ObjectProperty) -> Value { 
