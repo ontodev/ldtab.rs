@@ -57,6 +57,7 @@ pub fn translate_axiom(v : &Value) -> Axiom {
         Some("SubAnnotationPropertyOf") => translate_sub_annotation_assertion(v),
         Some("AnnotationPropertyDomain") => translate_annotation_property_domain(v),
         Some("AnnotationPropertyRange") => translate_annotation_property_range(v),
+        Some("Import") => translate_import(v),
 
         Some(_) => panic!("Not a valid OWL axiom operator"), 
         None => panic!("Not a valid (typed) OFN S-expression"), 
@@ -72,6 +73,27 @@ pub fn translate_named_class(v : &Value) -> Class {
         _ => panic!("Not a named entity"), 
     }; 
     b.class(iri).into()
+}
+
+pub fn translate_import(v : &Value) -> Axiom {
+
+    let b = Build::new();
+
+    let ontology_iri = match v[1].clone() {
+        Value::String(x) => x,
+        _ => panic!("Not a named entity"), 
+    }; 
+
+    let import_iri = match v[2].clone() {
+        Value::String(x) => x,
+        _ => panic!("Not a named entity"), 
+    }; 
+
+    //let ont = b.iri(ontology_iri).into();
+    let import = b.iri(import_iri).into();
+
+    let axiom = Import(import) ;
+    Axiom::Import(axiom)
 }
 
 pub fn translate_object_property(v : &Value) -> ObjectProperty {
