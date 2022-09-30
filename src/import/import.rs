@@ -1,25 +1,17 @@
-use horned_owl::command::parse_path;
 use serde_json::{Value};
 use serde_json::json; 
-use std::path::Path;
-use std::rc::Rc;
-use horned_owl::model::{IRI, AnnotatedAxiom, Ontology, Axiom, Build, Class, ClassAssertion, ClassExpression, DeclareClass, DeclareNamedIndividual, DisjointClasses, DisjointUnion, EquivalentClasses, EquivalentObjectProperties, NamedIndividual, ObjectProperty, ObjectPropertyDomain, ObjectPropertyExpression, SubObjectPropertyExpression, SubObjectPropertyOf, TransitiveObjectProperty, Individual as OWLIndividual, ObjectPropertyAssertion, Import, OntologyAnnotation};
-use horned_owl::model::ClassExpression::ObjectUnionOf;
+use horned_owl::model::{IRI, AnnotatedAxiom, Ontology, Axiom, Import, OntologyAnnotation, RcStr};
 use horned_owl::ontology::set::SetOntology;
 
 
-use rio_xml::{RdfXmlParser, RdfXmlError};
-use rio_api::parser::TriplesParser;
-use rio_api::model::*;
-
 use crate::owl2ofn::transducer as owl2ofn; 
+use crate::ofn2owl::transducer as ofn2owl; 
 use crate::owl2ofn::annotation_transducer as annotation_transducer; 
 
 extern crate wiring_rs; 
 
-use im::{HashSet, hashset};
 
-pub fn ontology_2_ldtab(ontology : &SetOntology) {
+pub fn ontology_2_ldtab(ontology : &SetOntology<RcStr>) {
     //TODO a SetOntology has the field "doc_iri" - however this doesn't seem to be always set?
     let id = ontology.id();
     let iri = id.clone().iri.unwrap(); //TODO can I assume that this exists?
@@ -29,21 +21,36 @@ pub fn ontology_2_ldtab(ontology : &SetOntology) {
         let axiom = &ann_axiom.axiom;
         let annotations = &ann_axiom.ann;
 
-        let inspect = match axiom {
-            Axiom::Import(x) => translate_ontology_import(&x, &iri),
-            Axiom::OntologyAnnotation(x) => translate_ontology_annotation(&x, &iri),
-            _ => owl_2_thick(&ann_axiom),
-        };
+        if !annotations.is_empty() {
 
-        //TODO insert into database 
-        println!("Input {:?}", ann_axiom);
-        println!("Output {}", inspect);
-        println!("===");
+            println!("0. Horned OWL: {:?}", ann_axiom);
+
+            //translate horned OWL to LDTab Thick Triple
+            let inspect = match axiom {
+
+                //two special cases:
+                Axiom::Import(x) => translate_ontology_import(&x, &iri),
+                Axiom::OntologyAnnotation(x) => translate_ontology_annotation(&x, &iri),
+
+                _ => owl_2_thick(&ann_axiom),
+            };
+
+
+        }
     }
 
 }
 
-pub fn translate_ontology_annotation(axiom : &OntologyAnnotation, ontology_iri : &IRI) -> Value {
+//the following translations are two special cases that cannot be
+//translated with the standard translation
+//(because some related information is split in Horned OWL's data model)
+pub fn translate_ontology_annotation(axiom : &OntologyAnnotation<RcStr>, ontology_iri : &IRI<RcStr>) -> Value {
+    //An ontolog annotation could be encoded as a OFN S-expression
+    //via
+    //["ThickTriple", s, p, o]
+    //or
+    //["Ontology", ["ThickTriple", s, p, o]]]
+    //
     let annotation = axiom.0.clone();
 
     let property = annotation.ap;
@@ -61,11 +68,11 @@ pub fn translate_ontology_annotation(axiom : &OntologyAnnotation, ontology_iri :
            "predicate":property.0.get(0..),
            "object":value_ldtab,
            "datatype":value_datatype,
-           "annotation":"Null"
+           "annotation":"Null" //TODO
        }) 
 }
 
-pub fn translate_ontology_import(axiom : &Import, ontology_iri : &IRI) -> Value {
+pub fn translate_ontology_import(axiom : &Import<RcStr>, ontology_iri : &IRI<RcStr>) -> Value {
 
     //TODO: sort this
        json!({"assertion":"1",
@@ -75,13 +82,18 @@ pub fn translate_ontology_import(axiom : &Import, ontology_iri : &IRI) -> Value 
            "predicate":"owl:imports",
            "object":axiom.0.get(0..),
            "datatype":"_IRI",
-           "annotation":"Null"
+           "annotation":"Null" //TODO
        }) 
 }
 
-pub fn owl_2_thick(annotated_axiom : &AnnotatedAxiom) -> Value {
+//translate a Horned OWL axiom to a LDTab ThickTriple
+pub fn owl_2_thick(annotated_axiom : &AnnotatedAxiom<RcStr>) -> Value {
 
+    //horned OWL to OFN S-expression
     let ofn = owl2ofn::translate(annotated_axiom);
+    println!("1 OFN: {}", ofn);
+
+    //OFN S-expression to LDTab ThickTriple
     let thick_triple = wiring_rs::ofn2ldtab::ofn_parser::translate_triple(&ofn);
 
     thick_triple

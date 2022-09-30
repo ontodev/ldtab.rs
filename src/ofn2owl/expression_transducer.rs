@@ -1,10 +1,11 @@
 use serde_json::{Value};
 use regex::Regex;
 use std::rc::Rc; 
-use horned_owl::model::{Build, Class, ClassExpression,  NamedIndividual, ObjectProperty, ObjectPropertyExpression, SubObjectPropertyExpression, Individual, AnonymousIndividual, DataProperty, DataRange, Datatype, Literal, FacetRestriction, Facet, PropertyExpression};
+use std::sync::Arc;
+use horned_owl::model::{Build, Class, ClassExpression,  NamedIndividual, ObjectProperty, ObjectPropertyExpression, SubObjectPropertyExpression, Individual, AnonymousIndividual, DataProperty, DataRange, Datatype, Literal, FacetRestriction, Facet, PropertyExpression, RcStr};
 
 
-pub fn translate_object_property_expression(v : &Value) -> ObjectPropertyExpression {
+pub fn translate_object_property_expression(v : &Value) -> ObjectPropertyExpression<RcStr> {
      match v[0].as_str() {
          Some("InverseOf") => translate_inverse_of(v), 
          Some("ObjectInverseOf") => translate_inverse_of(v), 
@@ -13,10 +14,10 @@ pub fn translate_object_property_expression(v : &Value) -> ObjectPropertyExpress
      } 
 }
 
-pub fn translate_sub_object_property_expression(v : &Value) -> SubObjectPropertyExpression {
+pub fn translate_sub_object_property_expression(v : &Value) -> SubObjectPropertyExpression<RcStr> {
     match v {
         Value::Array(array) => {
-            let operands: Vec<ObjectPropertyExpression> = (&array[1..])
+            let operands: Vec<ObjectPropertyExpression<RcStr>> = (&array[1..])
                 .into_iter()
                 .map(|x| translate_object_property_expression(&x))
                 .collect(); 
@@ -30,7 +31,7 @@ pub fn translate_sub_object_property_expression(v : &Value) -> SubObjectProperty
     }
 }
 
-pub fn translate_class_expression(v : &Value) -> ClassExpression { 
+pub fn translate_class_expression(v : &Value) -> ClassExpression<RcStr> { 
      match v[0].as_str() {
          //Some("SomeValuesFrom") => translate_some_values_from(v), 
          //Some("AllValuesFrom") => translate_all_values_from(v), 
@@ -84,7 +85,7 @@ pub fn translate_class_expression(v : &Value) -> ClassExpression {
      }
 } 
 
-pub fn translate_literal_string(s: &str) -> Literal {
+pub fn translate_literal_string(s: &str) -> Literal<RcStr> {
 
     let b = Build::new();
 
@@ -115,14 +116,14 @@ pub fn translate_literal_string(s: &str) -> Literal {
     }
 }
 
-pub fn translate_literal(v: &Value) -> Literal {
+pub fn translate_literal(v: &Value) -> Literal<RcStr> {
     match v.as_str() {
         Some(x) => translate_literal_string(x),
         None => panic!() 
     }
 }
 
-pub fn translate_data_range(v : &Value) -> DataRange {
+pub fn translate_data_range(v : &Value) -> DataRange<RcStr> {
 
     match v {
         Value::String(_x) => translate_datatype(v),
@@ -143,24 +144,24 @@ pub fn translate_data_range(v : &Value) -> DataRange {
     } 
 }
 
-pub fn translate_data_one_of(v : &Value) -> DataRange { 
+pub fn translate_data_one_of(v : &Value) -> DataRange<RcStr> { 
 
-    let operands: Vec<Literal> = (&(v.as_array().unwrap())[1..])
+    let operands: Vec<Literal<RcStr>> = (&(v.as_array().unwrap())[1..])
                                                .into_iter()
                                                .map(|x| translate_literal(&x))
                                                .collect(); 
     DataRange::DataOneOf(operands) 
 }
 
-pub fn translate_data_complement_of(v : &Value) -> DataRange { 
+pub fn translate_data_complement_of(v : &Value) -> DataRange<RcStr> { 
 
-    let argument: DataRange = translate_data_range(&v[1]); 
+    let argument: DataRange<RcStr> = translate_data_range(&v[1]); 
 
        DataRange::DataComplementOf(Box::new(argument))
 }
 
-pub fn translate_data_intersection_of(v : &Value) -> DataRange {
-    let operands: Vec<DataRange> = (&(v.as_array().unwrap())[1..])
+pub fn translate_data_intersection_of(v : &Value) -> DataRange<RcStr> {
+    let operands: Vec<DataRange<RcStr>> = (&(v.as_array().unwrap())[1..])
                                                .into_iter()
                                                .map(|x| translate_data_range(&x))
                                                .collect(); 
@@ -168,8 +169,8 @@ pub fn translate_data_intersection_of(v : &Value) -> DataRange {
     DataRange::DataIntersectionOf(operands) 
 }
 
-pub fn translate_data_union_of(v : &Value) -> DataRange {
-    let operands: Vec<DataRange> = (&(v.as_array().unwrap())[1..])
+pub fn translate_data_union_of(v : &Value) -> DataRange<RcStr> {
+    let operands: Vec<DataRange<RcStr>> = (&(v.as_array().unwrap())[1..])
                                                .into_iter()
                                                .map(|x| translate_data_range(&x))
                                                .collect(); 
@@ -177,7 +178,7 @@ pub fn translate_data_union_of(v : &Value) -> DataRange {
     DataRange::DataUnionOf(operands) 
 }
 
-pub fn translate_datatype(v : &Value) -> DataRange {
+pub fn translate_datatype(v : &Value) -> DataRange<RcStr> {
     let b = Build::new();
 
     let iri = match v {
@@ -185,10 +186,10 @@ pub fn translate_datatype(v : &Value) -> DataRange {
         _ => panic!("Not a named entity"), 
     }; 
     
-    DataRange::Datatype(b.datatype(iri))
+    DataRange::Datatype(b.datatype(iri.clone()))
 }
 
-pub fn translate_named_object_property(v : &Value) -> ObjectPropertyExpression {
+pub fn translate_named_object_property(v : &Value) -> ObjectPropertyExpression<RcStr> {
     let b = Build::new();
 
     let iri = match v {
@@ -196,10 +197,10 @@ pub fn translate_named_object_property(v : &Value) -> ObjectPropertyExpression {
         _ => panic!("Not a named entity"), 
     }; 
 
-    b.object_property(iri).into() 
+    b.object_property(iri.clone()).into() 
 }
 
-pub fn translate_data_property(v : &Value) -> DataProperty {
+pub fn translate_data_property(v : &Value) -> DataProperty<RcStr> {
     let b = Build::new();
 
     let iri = match v {
@@ -207,10 +208,10 @@ pub fn translate_data_property(v : &Value) -> DataProperty {
         _ => panic!("Not a named entity"), 
     }; 
 
-    b.data_property(iri).into() 
+    b.data_property(iri.clone()).into() 
 }
 
-pub fn translate_inverse_of(v : &Value) -> ObjectPropertyExpression {
+pub fn translate_inverse_of(v : &Value) -> ObjectPropertyExpression<RcStr> {
     let b = Build::new();
 
     let ofn_argument = v[1].clone(); 
@@ -223,7 +224,7 @@ pub fn translate_inverse_of(v : &Value) -> ObjectPropertyExpression {
     ObjectPropertyExpression::InverseObjectProperty{0: argument}
 }
 
-pub fn translate_named_class(v : &Value) -> ClassExpression {
+pub fn translate_named_class(v : &Value) -> ClassExpression<RcStr> {
 
     let b = Build::new();
 
@@ -232,10 +233,10 @@ pub fn translate_named_class(v : &Value) -> ClassExpression {
         _ => panic!("Not a named entity"), 
     }; 
 
-    b.class(iri).into()
+    b.class(iri.clone()).into()
 }
 
-pub fn translate_anonymous_individual(v : &Value) -> AnonymousIndividual {
+pub fn translate_anonymous_individual(v : &Value) -> AnonymousIndividual<RcStr> {
 
     let name = match v {
         Value::String(x) => x,
@@ -244,11 +245,13 @@ pub fn translate_anonymous_individual(v : &Value) -> AnonymousIndividual {
 
     let s = name.as_str();
     let rc : Rc<str> = Rc::from(s);
-
     AnonymousIndividual{0: rc} 
+
+    //let arc : Arc<str> = Arc::from(s); 
+    //AnonymousIndividual{0: arc} 
 }
 
-pub fn translate_individual(v : &Value) -> Individual {
+pub fn translate_individual(v : &Value) -> Individual<RcStr> {
 
     //TODO: handle anonymous individuals
 
@@ -259,13 +262,13 @@ pub fn translate_individual(v : &Value) -> Individual {
         _ => panic!("Not a named entity"), 
     }; 
 
-    b.named_individual(iri).into()
+    b.named_individual(iri.clone()).into()
 }
 
-pub fn translate_object_some_values_from(v : &Value) -> ClassExpression {
+pub fn translate_object_some_values_from(v : &Value) -> ClassExpression<RcStr> {
 
     let property = translate_object_property_expression(&v[1]); 
-    let filler: ClassExpression = translate_class_expression(&v[2]); 
+    let filler: ClassExpression<RcStr> = translate_class_expression(&v[2]); 
 
     ClassExpression::ObjectSomeValuesFrom {
         ope: property,
@@ -273,10 +276,10 @@ pub fn translate_object_some_values_from(v : &Value) -> ClassExpression {
     } 
 }
 
-pub fn translate_object_all_values_from(v : &Value) -> ClassExpression {
+pub fn translate_object_all_values_from(v : &Value) -> ClassExpression<RcStr> {
 
     let property = translate_object_property_expression(&v[1]); 
-    let filler: ClassExpression = translate_class_expression(&v[2]); 
+    let filler: ClassExpression<RcStr> = translate_class_expression(&v[2]); 
 
     ClassExpression::ObjectAllValuesFrom {
         ope: property,
@@ -284,10 +287,10 @@ pub fn translate_object_all_values_from(v : &Value) -> ClassExpression {
     } 
 }
 
-pub fn translate_object_has_value(v : &Value) -> ClassExpression {
+pub fn translate_object_has_value(v : &Value) -> ClassExpression<RcStr> {
 
     let property = translate_object_property_expression(&v[1]); 
-    let individual: Individual = translate_individual(&v[2]); 
+    let individual: Individual<RcStr> = translate_individual(&v[2]); 
 
     ClassExpression::ObjectHasValue {
         ope: property,
@@ -295,7 +298,7 @@ pub fn translate_object_has_value(v : &Value) -> ClassExpression {
     } 
 }
 
-pub fn translate_object_min_cardinality(v : &Value) -> ClassExpression { 
+pub fn translate_object_min_cardinality(v : &Value) -> ClassExpression<RcStr> { 
     let b = Build::new();
 
     let cardinality = match v[1].clone() {
@@ -327,7 +330,7 @@ pub fn translate_object_min_cardinality(v : &Value) -> ClassExpression {
     } 
 }
 
-pub fn translate_object_min_qualified_cardinality(v : &Value) -> ClassExpression { 
+pub fn translate_object_min_qualified_cardinality(v : &Value) -> ClassExpression<RcStr> { 
 
     let cardinality = match v[1].clone() {
         Value::String(x) => {
@@ -338,7 +341,7 @@ pub fn translate_object_min_qualified_cardinality(v : &Value) -> ClassExpression
     }; 
 
     let property = translate_object_property_expression(&v[2]); 
-    let filler: ClassExpression = translate_class_expression(&v[3]); 
+    let filler: ClassExpression<RcStr> = translate_class_expression(&v[3]); 
 
     ClassExpression::ObjectMinCardinality {
         n : cardinality as u32,
@@ -347,7 +350,7 @@ pub fn translate_object_min_qualified_cardinality(v : &Value) -> ClassExpression
     } 
 }
 
-pub fn translate_object_max_cardinality(v : &Value) -> ClassExpression { 
+pub fn translate_object_max_cardinality(v : &Value) -> ClassExpression<RcStr> { 
 
     let b = Build::new();
 
@@ -380,7 +383,7 @@ pub fn translate_object_max_cardinality(v : &Value) -> ClassExpression {
     } 
 }
 
-pub fn translate_object_max_qualified_cardinality(v : &Value) -> ClassExpression { 
+pub fn translate_object_max_qualified_cardinality(v : &Value) -> ClassExpression<RcStr> { 
 
     let cardinality = match v[1].clone() { 
         Value::String(x) => {
@@ -391,7 +394,7 @@ pub fn translate_object_max_qualified_cardinality(v : &Value) -> ClassExpression
     }; 
 
     let property = translate_object_property_expression(&v[2]); 
-    let filler: ClassExpression = translate_class_expression(&v[3]); 
+    let filler: ClassExpression<RcStr> = translate_class_expression(&v[3]); 
 
     ClassExpression::ObjectMaxCardinality {
         n : cardinality as u32,
@@ -401,7 +404,7 @@ pub fn translate_object_max_qualified_cardinality(v : &Value) -> ClassExpression
 }
 
 
-pub fn translate_object_exact_cardinality(v : &Value) -> ClassExpression { 
+pub fn translate_object_exact_cardinality(v : &Value) -> ClassExpression<RcStr> { 
 
     let b = Build::new();
 
@@ -434,7 +437,7 @@ pub fn translate_object_exact_cardinality(v : &Value) -> ClassExpression {
     } 
 }
 
-pub fn translate_object_exact_qualified_cardinality(v : &Value) -> ClassExpression { 
+pub fn translate_object_exact_qualified_cardinality(v : &Value) -> ClassExpression<RcStr> { 
 
     let cardinality = match v[1].clone() {
         Value::String(x) => {
@@ -445,7 +448,7 @@ pub fn translate_object_exact_qualified_cardinality(v : &Value) -> ClassExpressi
     }; 
 
     let property = translate_object_property_expression(&v[2]); 
-    let filler: ClassExpression = translate_class_expression(&v[3]); 
+    let filler: ClassExpression<RcStr> = translate_class_expression(&v[3]); 
 
     ClassExpression::ObjectExactCardinality {
         n : cardinality as u32,
@@ -454,15 +457,15 @@ pub fn translate_object_exact_qualified_cardinality(v : &Value) -> ClassExpressi
     } 
 }
 
-pub fn translate_object_has_self(v : &Value) -> ClassExpression { 
+pub fn translate_object_has_self(v : &Value) -> ClassExpression<RcStr> { 
 
     let property = translate_object_property_expression(&v[1]); 
     ClassExpression::ObjectHasSelf(property) 
 }
 
-pub fn translate_object_intersection_of(v : &Value) -> ClassExpression { 
+pub fn translate_object_intersection_of(v : &Value) -> ClassExpression<RcStr> { 
 
-    let operands: Vec<ClassExpression> = (&(v.as_array().unwrap())[1..])
+    let operands: Vec<ClassExpression<RcStr>> = (&(v.as_array().unwrap())[1..])
                                                .into_iter()
                                                .map(|x| translate_class_expression(&x))
                                                .collect(); 
@@ -470,9 +473,9 @@ pub fn translate_object_intersection_of(v : &Value) -> ClassExpression {
     ClassExpression::ObjectIntersectionOf(operands)
 }
 
-pub fn translate_object_union_of(v : &Value) -> ClassExpression { 
+pub fn translate_object_union_of(v : &Value) -> ClassExpression<RcStr> { 
 
-    let operands: Vec<ClassExpression> = (&(v.as_array().unwrap())[1..])
+    let operands: Vec<ClassExpression<RcStr>> = (&(v.as_array().unwrap())[1..])
                                                .into_iter()
                                                .map(|x| translate_class_expression(&x))
                                                .collect(); 
@@ -480,9 +483,9 @@ pub fn translate_object_union_of(v : &Value) -> ClassExpression {
     ClassExpression::ObjectUnionOf(operands)
 }
 
-pub fn translate_object_one_of(v : &Value) -> ClassExpression { 
+pub fn translate_object_one_of(v : &Value) -> ClassExpression<RcStr> { 
 
-    let operands: Vec<Individual> = (&(v.as_array().unwrap())[1..])
+    let operands: Vec<Individual<RcStr>> = (&(v.as_array().unwrap())[1..])
                                                .into_iter()
                                                .map(|x| translate_individual(&x))
                                                .collect(); 
@@ -490,17 +493,17 @@ pub fn translate_object_one_of(v : &Value) -> ClassExpression {
     ClassExpression::ObjectOneOf(operands)
 }
 
-pub fn translate_object_complement_of(v : &Value) -> ClassExpression { 
+pub fn translate_object_complement_of(v : &Value) -> ClassExpression<RcStr> { 
 
-    let argument: ClassExpression = translate_class_expression(&v[1]); 
+    let argument: ClassExpression<RcStr> = translate_class_expression(&v[1]); 
 
        ClassExpression::ObjectComplementOf(Box::new(argument))
 }
 
-pub fn translate_data_some_values_from(v : &Value) -> ClassExpression {
+pub fn translate_data_some_values_from(v : &Value) -> ClassExpression<RcStr> {
 
     let property = translate_data_property(&v[1]); 
-    let filler: DataRange = translate_data_range(&v[2]); 
+    let filler: DataRange<RcStr> = translate_data_range(&v[2]); 
 
     ClassExpression::DataSomeValuesFrom {
         dp: property,
@@ -508,10 +511,10 @@ pub fn translate_data_some_values_from(v : &Value) -> ClassExpression {
     } 
 }
 
-pub fn translate_data_all_values_from(v : &Value) -> ClassExpression {
+pub fn translate_data_all_values_from(v : &Value) -> ClassExpression<RcStr> {
 
     let property = translate_data_property(&v[1]); 
-    let filler: DataRange = translate_data_range(&v[2]); 
+    let filler: DataRange<RcStr> = translate_data_range(&v[2]); 
 
     ClassExpression::DataAllValuesFrom {
         dp: property,
@@ -519,10 +522,10 @@ pub fn translate_data_all_values_from(v : &Value) -> ClassExpression {
     } 
 }
 
-pub fn translate_data_has_value(v : &Value) -> ClassExpression {
+pub fn translate_data_has_value(v : &Value) -> ClassExpression<RcStr> {
 
     let property = translate_data_property(&v[1]); 
-    let filler: Literal = translate_literal(&v[2]); 
+    let filler: Literal<RcStr> = translate_literal(&v[2]); 
 
     ClassExpression::DataHasValue {
         dp: property,
@@ -530,7 +533,7 @@ pub fn translate_data_has_value(v : &Value) -> ClassExpression {
     } 
 }
 
-pub fn translate_data_min_cardinality(v : &Value) -> ClassExpression { 
+pub fn translate_data_min_cardinality(v : &Value) -> ClassExpression<RcStr> { 
 
     let b = Build::new();
 
@@ -566,7 +569,7 @@ pub fn translate_data_min_cardinality(v : &Value) -> ClassExpression {
     } 
 }
 
-pub fn translate_data_min_qualified_cardinality(v : &Value) -> ClassExpression { 
+pub fn translate_data_min_qualified_cardinality(v : &Value) -> ClassExpression<RcStr> { 
 
     let cardinality = match v[1].clone() {
         Value::Number(x) => {
@@ -579,7 +582,7 @@ pub fn translate_data_min_qualified_cardinality(v : &Value) -> ClassExpression {
     }; 
 
     let property = translate_data_property(&v[2]); 
-    let filler: DataRange = translate_data_range(&v[3]);
+    let filler: DataRange<RcStr> = translate_data_range(&v[3]);
 
     ClassExpression::DataMinCardinality {
         n : cardinality as u32,
@@ -588,7 +591,7 @@ pub fn translate_data_min_qualified_cardinality(v : &Value) -> ClassExpression {
     } 
 }
 
-pub fn translate_data_max_cardinality(v : &Value) -> ClassExpression { 
+pub fn translate_data_max_cardinality(v : &Value) -> ClassExpression<RcStr> { 
 
     let b = Build::new();
 
@@ -622,7 +625,7 @@ pub fn translate_data_max_cardinality(v : &Value) -> ClassExpression {
     } 
 }
 
-pub fn translate_data_max_qualified_cardinality(v : &Value) -> ClassExpression { 
+pub fn translate_data_max_qualified_cardinality(v : &Value) -> ClassExpression<RcStr> { 
 
     let cardinality = match v[1].clone() {
         Value::Number(x) => {
@@ -635,7 +638,7 @@ pub fn translate_data_max_qualified_cardinality(v : &Value) -> ClassExpression {
     }; 
 
     let property = translate_data_property(&v[2]); 
-    let filler: DataRange = translate_data_range(&v[3]);
+    let filler: DataRange<RcStr> = translate_data_range(&v[3]);
 
     ClassExpression::DataMaxCardinality {
         n : cardinality as u32,
@@ -644,7 +647,7 @@ pub fn translate_data_max_qualified_cardinality(v : &Value) -> ClassExpression {
     } 
 }
 
-pub fn translate_data_exact_cardinality(v : &Value) -> ClassExpression { 
+pub fn translate_data_exact_cardinality(v : &Value) -> ClassExpression<RcStr> { 
 
     let b = Build::new();
 
@@ -677,7 +680,7 @@ pub fn translate_data_exact_cardinality(v : &Value) -> ClassExpression {
     } 
 }
 
-pub fn translate_data_exact_qualified_cardinality(v : &Value) -> ClassExpression { 
+pub fn translate_data_exact_qualified_cardinality(v : &Value) -> ClassExpression<RcStr> { 
 
     let cardinality = match v[1].clone() {
         Value::Number(x) => {
@@ -690,7 +693,7 @@ pub fn translate_data_exact_qualified_cardinality(v : &Value) -> ClassExpression
     }; 
 
     let property = translate_data_property(&v[2]); 
-    let filler: DataRange = translate_data_range(&v[3]);
+    let filler: DataRange<RcStr> = translate_data_range(&v[3]);
 
     ClassExpression::DataExactCardinality {
         n : cardinality as u32,
