@@ -1,0 +1,65 @@
+name: Create artifacts
+
+on:
+  release:
+    types: [push]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-binaries:
+    strategy:
+      matrix:
+        target: [
+          { runner: "macos-11", arch: "x86_64-apple-darwin" },
+          { runner: "macos-11", arch: "aarch64-apple-darwin" },
+          { runner: "windows-2022", arch: "x86_64-pc-windows-msvc" },
+          { runner: "ubuntu-20.04", arch: "x86_64-unknown-linux-gnu" },
+          { runner: "ubuntu-20.04", arch: "x86_64-unknown-linux-musl" },
+        ]
+    runs-on: ${{ matrix.target.runner }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+
+      - name: Install musl-tools (MUSL)
+        if: ${{ matrix.target.runner == 'ubuntu-20.04' && matrix.target.arch == 'x86_64-unknown-linux-musl' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install musl-tools
+
+      - name: Install latest rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target.arch }}
+          default: true
+          override: true
+
+      - name: Build binary using cross (Linux)
+        if: ${{ matrix.target.runner == 'ubuntu-20.04' }}
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+          sudo systemctl start docker
+          cross build --release --target ${{ matrix.target.arch }}
+          cp target/${{ matrix.target.arch }}/release/ldtab ldtab-${{ matrix.target.arch }}
+
+      - name: Build binary using cargo (MacOS)
+        if: ${{ matrix.target.runner == 'macos-11' }}
+        run: |
+          cargo build --release --target ${{ matrix.target.arch }}
+          cp target/${{ matrix.target.arch }}/release/ldtab ldtab-${{ matrix.target.arch }}
+
+      - name: Build binary using cargo (Windows)
+        if: ${{ matrix.target.runner == 'windows-2022' }}
+        run: |
+          cargo build --release --target ${{ matrix.target.arch }}
+          cp target\${{ matrix.target.arch }}\release\ldtab.exe ldtab-${{ matrix.target.arch }}.exe 
+
+      - name: Upload binary artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.target.arch }}-bin
+          path: ldtab-${{ matrix.target.arch }}
+          if-no-files-found: error
