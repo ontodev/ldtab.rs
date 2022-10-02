@@ -1,8 +1,7 @@
 name: Create artifacts
 
 on:
-  release:
-    types: [push]
+    [push]
 
 env:
   CARGO_TERM_COLOR: always
