@@ -1,9 +1,7 @@
 use serde_json::{Value};
-use serde_json::json; 
-use horned_owl::model::{Build, Annotation, AnnotationProperty, AnnotationValue, AnnotationSubject, ArcStr, RcStr};
+use horned_owl::model::{Build, Annotation, AnnotationProperty, AnnotationValue, AnnotationSubject, RcStr};
 use crate::ofn_2_owl::expression_transducer as expression_transducer;
 use crate::ofn_2_owl::util as util;
-use std::collections::BTreeSet;
 
 pub fn translate_annotation(v : &Value) -> Annotation<RcStr> {
     let property = translate_annotation_property(&v[1]);

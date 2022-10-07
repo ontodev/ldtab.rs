@@ -1,8 +1,8 @@
 use serde_json::{Value};
 use regex::Regex;
 use std::rc::Rc; 
-use std::sync::Arc;
-use horned_owl::model::{Build, Class, ClassExpression,  NamedIndividual, ObjectProperty, ObjectPropertyExpression, SubObjectPropertyExpression, Individual, AnonymousIndividual, DataProperty, DataRange, Datatype, Literal, FacetRestriction, Facet, PropertyExpression, RcStr};
+//use std::sync::Arc;
+use horned_owl::model::{Build, ClassExpression,  ObjectPropertyExpression, SubObjectPropertyExpression, Individual, AnonymousIndividual, DataProperty, DataRange, Literal, RcStr};
 
 
 pub fn translate_object_property_expression(v : &Value) -> ObjectPropertyExpression<RcStr> {

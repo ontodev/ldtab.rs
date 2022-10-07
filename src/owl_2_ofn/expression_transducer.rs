@@ -20,7 +20,7 @@ pub fn translate_property_expression(expression : &PropertyExpression<RcStr>) ->
     match expression {
         PropertyExpression::ObjectPropertyExpression(x) => translate_object_property_expression(&x),
         PropertyExpression::DataProperty(x) => translate_data_property(&x),
-        PropertyExpression::AnnotationProperty(x) => json!("TODO"),  //TODO
+        PropertyExpression::AnnotationProperty(_x) => json!("TODO"),  //TODO
     } 
 }
 

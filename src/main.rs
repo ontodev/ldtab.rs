@@ -1,24 +1,12 @@
 use horned_owl::command::parse_path;
-use serde_json::{Value};
 use std::path::Path;
-use std::rc::Rc;
-use horned_owl::model::{Axiom, Ontology, Build, Class, ClassAssertion, ClassExpression, DeclareClass, DeclareNamedIndividual, DisjointClasses, DisjointUnion, EquivalentClasses, EquivalentObjectProperties, NamedIndividual, ObjectProperty, ObjectPropertyDomain, ObjectPropertyExpression, SubObjectPropertyExpression, SubObjectPropertyOf, TransitiveObjectProperty, Individual as OWLIndividual, ObjectPropertyAssertion, RcStr};
-use horned_owl::model::ClassExpression::ObjectUnionOf;
-use horned_owl::ontology::set::SetOntology;
-use horned_owl::ontology::axiom_mapped::AxiomMappedOntology as mapped;
-use horned_owl::io::owx::writer::write as serialise;
 use std::env;
 
-
-
-use rio_xml::{RdfXmlParser, RdfXmlError};
-use rio_api::parser::TriplesParser;
-use rio_api::model::*;
-
-use std::fs::File;
-
-
-use im::{HashSet, hashset};
+//use rio_xml::{RdfXmlParser, RdfXmlError};
+//use rio_api::parser::TriplesParser;
+//use rio_api::model::*; 
+//use std::fs::File; 
+//use im::{HashSet, hashset};
 
 pub mod xml;
 pub mod owl_2_ofn;

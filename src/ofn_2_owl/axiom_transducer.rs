@@ -1,13 +1,12 @@
 use serde_json::{Value};
-use serde_json::json; 
 use crate::ofn_2_owl::expression_transducer as expression_transducer;
 use crate::ofn_2_owl::annotation_transducer as annotation_transducer;
-use horned_owl::model::{Annotation, Individual, AnnotationProperty, Datatype, NamedIndividual, DataProperty, ObjectProperty, Build, Class, ClassExpression, AnnotatedAxiom, Axiom, SubClassOf, ClassAssertion, DeclareClass, DeclareObjectProperty, DeclareDatatype, DeclareDataProperty, DeclareNamedIndividual, DisjointClasses, DisjointUnion, EquivalentClasses, EquivalentObjectProperties, ObjectPropertyDomain, ObjectPropertyExpression, SubObjectPropertyOf, TransitiveObjectProperty, ObjectPropertyAssertion, ReflexiveObjectProperty, IrreflexiveObjectProperty, SymmetricObjectProperty, AsymmetricObjectProperty, ObjectPropertyRange, InverseObjectProperties, FunctionalObjectProperty, InverseFunctionalObjectProperty, DisjointObjectProperties, Import, SubDataPropertyOf, EquivalentDataProperties, DisjointDataProperties, DataPropertyDomain, DataPropertyRange, FunctionalDataProperty, DatatypeDefinition, HasKey, SameIndividual, DifferentIndividuals, NegativeObjectPropertyAssertion, DataPropertyAssertion, NegativeDataPropertyAssertion, AnnotationAssertion, OntologyAnnotation, DeclareAnnotationProperty, SubAnnotationPropertyOf, AnnotationPropertyDomain, AnnotationPropertyRange, ArcStr, RcStr};
+use horned_owl::model::{Annotation, Individual, AnnotationProperty, Datatype, NamedIndividual, DataProperty, ObjectProperty, Build, Class, ClassExpression, Axiom, SubClassOf, ClassAssertion, DeclareClass, DeclareObjectProperty, DeclareDatatype, DeclareDataProperty, DeclareNamedIndividual, DisjointClasses, DisjointUnion, EquivalentClasses, EquivalentObjectProperties, ObjectPropertyDomain, ObjectPropertyExpression, SubObjectPropertyOf, TransitiveObjectProperty, ObjectPropertyAssertion, ReflexiveObjectProperty, IrreflexiveObjectProperty, SymmetricObjectProperty, AsymmetricObjectProperty, ObjectPropertyRange, InverseObjectProperties, FunctionalObjectProperty, InverseFunctionalObjectProperty, DisjointObjectProperties, Import, SubDataPropertyOf, EquivalentDataProperties, DisjointDataProperties, DataPropertyDomain, DataPropertyRange, FunctionalDataProperty, DatatypeDefinition, SameIndividual, DifferentIndividuals, NegativeObjectPropertyAssertion, DataPropertyAssertion, NegativeDataPropertyAssertion, AnnotationAssertion, DeclareAnnotationProperty, SubAnnotationPropertyOf, AnnotationPropertyDomain, AnnotationPropertyRange,  RcStr};
 
-pub fn translate(v : &Value) -> AnnotatedAxiom<RcStr> {
-    panic!()
-
-}
+//TODO: 
+//pub fn translate(v : &Value) -> AnnotatedAxiom<RcStr> {
+//    panic!() 
+//}
 
 pub fn translate_axiom(v : &Value) -> Axiom<RcStr> {
 
@@ -79,7 +78,7 @@ pub fn translate_import(v : &Value) -> Axiom<RcStr> {
 
     let b = Build::new();
 
-    let ontology_iri = match v[1].clone() {
+    let _ontology_iri = match v[1].clone() {
         Value::String(x) => x,
         _ => panic!("Not a named entity"), 
     }; 
