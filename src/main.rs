@@ -1,6 +1,9 @@
 use horned_owl::command::parse_path;
 use std::path::Path;
 use std::env;
+use horned_owl::ontology::set::SetOntology;
+use horned_owl::model::*;
+use serde_json::{Value};
 
 //use rio_xml::{RdfXmlParser, RdfXmlError};
 //use rio_api::parser::TriplesParser;
@@ -24,17 +27,40 @@ fn main() {
     match parse_path(Path::new(&args[1])) {
         Ok(parsed) => {
                 let ont = &parsed.decompose().0;
+
+                demo(ont);
                 
-                let r_test = round::ontology::ontology_2_ldtab(ont);
-
-                //serialise a horned OWL ontology
-                //let ax_map = mapped::from(ont.clone());
-                //let ax_map = mapped::from(r_test.clone());
-
-                //let buffer = File::create("out.owl").unwrap(); 
-                //let res = serialise(buffer, &ax_map, None);
-                //println!("{:?}", res); 
         }
         Err(error) => { dbg!("ERROR: {}", error); }
+    } 
+}
+
+fn demo(ontology : &SetOntology<RcStr>)  {
+
+    let id = ontology.id();
+    let iri = id.clone().iri.unwrap(); 
+    let iri_value = Value::String(String::from(iri.get(0..).unwrap()));
+
+    for ann_axiom in ontology.iter() { 
+        println!("Horned OWL: {:?}" , ann_axiom);
+
+        //1. translate Horned OWL to OFN S-expression
+        let ofn = owl_2_ofn::transducer::translate(ann_axiom);
+        let ofn =
+        match ofn[0].as_str() {
+            Some("Import") => Value::Array(vec![ofn[0].clone(), iri_value.clone(), ofn[1].clone()]),
+            Some("OntologyAnnotation") => Value::Array(vec![ofn[0].clone(), iri_value.clone(), ofn[1].clone()]) ,
+            _ => ofn.clone() 
+        };
+        println!("OFN S-expression: {}" , ofn);
+
+        //2. translate OFN S-Expression to LDTab ThickTriple
+        let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn); 
+        println!("LDTab: {}" , ldtab);
+        
+        //3. Get typing and labeling information from ontology
+        //4. Use wiring to type and label expressions
+        //5. use ofn_2_ofn module to translate OWL axioms back into Horned OWL
+
     } 
 }
