@@ -21,8 +21,8 @@ use std::fs::File;
 use im::{HashSet, hashset};
 
 pub mod xml;
-pub mod owl2ofn;
-pub mod ofn2owl;
+pub mod owl_2_ofn;
+pub mod ofn_2_owl;
 pub mod import;
 extern crate wiring_rs;
 

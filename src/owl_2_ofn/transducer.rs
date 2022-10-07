@@ -1,7 +1,7 @@
 use serde_json::{Value};
 use serde_json::json; 
-use crate::owl2ofn::axiom_transducer as axiom_transducer;
-use crate::owl2ofn::annotation_transducer as annotation_transducer;
+use crate::owl_2_ofn::axiom_transducer as axiom_transducer;
+use crate::owl_2_ofn::annotation_transducer as annotation_transducer;
 use horned_owl::model::{AnnotatedAxiom, Axiom, RcStr};
 
 pub fn translate(axiom : &AnnotatedAxiom<RcStr>) -> Value {

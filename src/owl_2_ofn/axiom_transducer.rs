@@ -1,10 +1,20 @@
 use serde_json::{Value};
 use serde_json::json; 
-use crate::owl2ofn::expression_transducer as expression_transducer;
-use crate::owl2ofn::annotation_transducer as annotation_transducer;
+use crate::owl_2_ofn::expression_transducer as expression_transducer;
+use crate::owl_2_ofn::annotation_transducer as annotation_transducer;
 use horned_owl::model::{Axiom, SubClassOf, ClassAssertion, DeclareClass, DeclareObjectProperty, DeclareDatatype, DeclareDataProperty, DeclareNamedIndividual, DisjointClasses, DisjointUnion, EquivalentClasses, EquivalentObjectProperties, ObjectPropertyDomain, ObjectPropertyExpression, SubObjectPropertyOf, TransitiveObjectProperty, ObjectPropertyAssertion, ReflexiveObjectProperty, IrreflexiveObjectProperty, SymmetricObjectProperty, AsymmetricObjectProperty, ObjectPropertyRange, InverseObjectProperties, FunctionalObjectProperty, InverseFunctionalObjectProperty, DisjointObjectProperties, Import, SubDataPropertyOf, EquivalentDataProperties, DisjointDataProperties, DataPropertyDomain, DataPropertyRange, FunctionalDataProperty, DatatypeDefinition, HasKey, SameIndividual, DifferentIndividuals, NegativeObjectPropertyAssertion, DataPropertyAssertion, NegativeDataPropertyAssertion, AnnotationAssertion, OntologyAnnotation, DeclareAnnotationProperty, SubAnnotationPropertyOf, AnnotationPropertyDomain, AnnotationPropertyRange, RcStr};
 
 
+///Translates an OWL axiom into an OFN S-expression
+///
+///# Examples
+/// let builder = Build::new();
+/// let sub = b.class("http://example/namespace#subclass").into();
+/// let sup = b.class("http://example/namespace#superclass").into();
+/// let axiom = SubClassOf{sub : sub,
+///                        sup : sup};
+/// let ofn = translate(&axiom);
+/// println("{}", ofn);
 pub fn translate(axiom : &Axiom<RcStr>) -> Value {
 
     match axiom {

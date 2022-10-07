@@ -1,6 +1,6 @@
 use serde_json::{Value};
 use serde_json::json; 
-use crate::owl2ofn::expression_transducer as expression_transducer;
+use crate::owl_2_ofn::expression_transducer as expression_transducer;
 use horned_owl::model::{Annotation, AnnotationProperty, AnnotationValue, AnnotationSubject, RcStr};
 use std::collections::BTreeSet;
 
