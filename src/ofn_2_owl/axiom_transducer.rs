@@ -3,11 +3,6 @@ use crate::ofn_2_owl::expression_transducer as expression_transducer;
 use crate::ofn_2_owl::annotation_transducer as annotation_transducer;
 use horned_owl::model::{Annotation, Individual, AnnotationProperty, Datatype, NamedIndividual, DataProperty, ObjectProperty, Build, Class, ClassExpression, Axiom, SubClassOf, ClassAssertion, DeclareClass, DeclareObjectProperty, DeclareDatatype, DeclareDataProperty, DeclareNamedIndividual, DisjointClasses, DisjointUnion, EquivalentClasses, EquivalentObjectProperties, ObjectPropertyDomain, ObjectPropertyExpression, SubObjectPropertyOf, TransitiveObjectProperty, ObjectPropertyAssertion, ReflexiveObjectProperty, IrreflexiveObjectProperty, SymmetricObjectProperty, AsymmetricObjectProperty, ObjectPropertyRange, InverseObjectProperties, FunctionalObjectProperty, InverseFunctionalObjectProperty, DisjointObjectProperties, Import, SubDataPropertyOf, EquivalentDataProperties, DisjointDataProperties, DataPropertyDomain, DataPropertyRange, FunctionalDataProperty, DatatypeDefinition, SameIndividual, DifferentIndividuals, NegativeObjectPropertyAssertion, DataPropertyAssertion, NegativeDataPropertyAssertion, AnnotationAssertion, DeclareAnnotationProperty, SubAnnotationPropertyOf, AnnotationPropertyDomain, AnnotationPropertyRange,  RcStr};
 
-//TODO: 
-//pub fn translate(v : &Value) -> AnnotatedAxiom<RcStr> {
-//    panic!() 
-//}
-
 pub fn translate_axiom(v : &Value) -> Axiom<RcStr> {
 
     match v[0].as_str() {
@@ -130,16 +125,6 @@ pub fn translate_named_individual(v : &Value) -> NamedIndividual<RcStr> {
 }
 
 //TODO refactor this into expression_transducer 
-pub fn translate_datatype(v : &Value) -> Datatype<RcStr> {
-
-    let b = Build::new();
-
-    let iri = match v {
-        Value::String(x) => x,
-        _ => panic!("Not a named entity"), 
-    }; 
-    b.datatype(iri.clone()).into()
-}
 
 pub fn translate_subclass_of(v : &Value) -> Axiom<RcStr> {
     let sub =  expression_transducer::translate_class_expression(&v[1]);
@@ -221,7 +206,7 @@ pub fn translate_named_individual_declaration(v : &Value) -> Axiom<RcStr> {
 
 pub fn translate_datatype_declaration(v : &Value) -> Axiom<RcStr> {
 
-    let datatype = translate_datatype(&v[1]);
+    let datatype = expression_transducer::translate_datatype(&v[1]);
     let axiom = DeclareDatatype{0: datatype};
     Axiom::DeclareDatatype(axiom)
 }
@@ -386,7 +371,7 @@ pub fn translate_functional_data_property(v : &Value) -> Axiom<RcStr> {
 
 pub fn translate_datatype_definition(v : &Value) -> Axiom<RcStr> {
 
-    let kind = translate_datatype(&v[1]);
+    let kind = expression_transducer::translate_datatype(&v[1]);
     let range = expression_transducer::translate_data_range(&v[2]);
 
     let axiom = DatatypeDefinition{kind : kind, range : range};

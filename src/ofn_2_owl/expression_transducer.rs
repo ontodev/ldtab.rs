@@ -2,7 +2,7 @@ use serde_json::{Value};
 use regex::Regex;
 use std::rc::Rc; 
 //use std::sync::Arc;
-use horned_owl::model::{Build, ClassExpression,  ObjectPropertyExpression, SubObjectPropertyExpression, Individual, AnonymousIndividual, DataProperty, DataRange, Literal, RcStr};
+use horned_owl::model::{Build, ClassExpression,  ObjectPropertyExpression, SubObjectPropertyExpression, Individual, AnonymousIndividual, DataProperty, Datatype, DataRange, Literal, RcStr};
 
 
 pub fn translate_object_property_expression(v : &Value) -> ObjectPropertyExpression<RcStr> {
@@ -126,10 +126,10 @@ pub fn translate_literal(v: &Value) -> Literal<RcStr> {
 pub fn translate_data_range(v : &Value) -> DataRange<RcStr> {
 
     match v {
-        Value::String(_x) => translate_datatype(v),
+        Value::String(_x) => translate_datatype_as_range(v),
         Value::Array(_x) =>  { 
             match v[0].as_str() {
-                Some("Datatype") => translate_datatype(v), 
+                Some("Datatype") => translate_datatype_as_range(v), 
                 Some("DataIntersectionOf") => translate_data_intersection_of(v), 
                 Some("DataUnionOf") => translate_data_union_of(v), 
                 Some("DataComplementOf") => translate_data_complement_of(v), 
@@ -178,7 +178,18 @@ pub fn translate_data_union_of(v : &Value) -> DataRange<RcStr> {
     DataRange::DataUnionOf(operands) 
 }
 
-pub fn translate_datatype(v : &Value) -> DataRange<RcStr> {
+pub fn translate_datatype(v : &Value) -> Datatype<RcStr> {
+
+    let b = Build::new();
+
+    let iri = match v {
+        Value::String(x) => x,
+        _ => panic!("Not a named entity"), 
+    }; 
+    b.datatype(iri.clone()).into()
+}
+
+pub fn translate_datatype_as_range(v : &Value) -> DataRange<RcStr> {
     let b = Build::new();
 
     let iri = match v {
