@@ -4,12 +4,53 @@ use horned_owl::model::{IRI, AnnotatedAxiom, Ontology, Axiom, Import, OntologyAn
 use horned_owl::ontology::set::SetOntology;
 
 
-use crate::owl2ofn::transducer as owl2ofn; 
-use crate::ofn2owl::transducer as ofn2owl; 
-use crate::owl2ofn::annotation_transducer as annotation_transducer; 
+use crate::owl_2_ofn::transducer as owl2ofn; 
+use crate::ofn_2_owl::transducer as ofn2owl; 
+use crate::owl_2_ofn::annotation_transducer as annotation_transducer; 
+use std::collections::HashSet;
+use horned_owl::command::parse_path;
+use std::path::Path;
 
 extern crate wiring_rs; 
 
+
+//Ideally, this would return a stream
+pub fn import(path : &str) -> HashSet<String> {
+
+    match parse_path(Path::new(path)) {
+        Ok(parsed) => {
+                let ont = &parsed.decompose().0;
+
+                process_ontology(ont)
+                
+        }
+        Err(error) => { panic!() }
+    } 
+}
+
+fn process_ontology(ontology : &SetOntology<RcStr>) -> HashSet<String>  {
+
+    let mut res = HashSet::new(); 
+
+    let id = ontology.id();
+    let iri = id.clone().iri.unwrap(); 
+    let iri_value = Value::String(String::from(iri.get(0..).unwrap()));
+
+    for ann_axiom in ontology.iter() { 
+
+        let ofn = owl2ofn::translate(ann_axiom);
+        let ofn =
+        match ofn[0].as_str() {
+            Some("Import") => Value::Array(vec![ofn[0].clone(), iri_value.clone(), ofn[1].clone()]),
+            Some("OntologyAnnotation") => Value::Array(vec![ofn[0].clone(), iri_value.clone(), ofn[1].clone()]) ,
+            _ => ofn.clone() 
+        };
+
+        let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn); 
+        res.insert(ldtab.to_string()); 
+    } 
+    res
+}
 
 pub fn ontology_2_ldtab(ontology : &SetOntology<RcStr>) {
     //TODO a SetOntology has the field "doc_iri" - however this doesn't seem to be always set?
@@ -56,8 +97,8 @@ pub fn translate_ontology_annotation(axiom : &OntologyAnnotation<RcStr>, ontolog
     let property = annotation.ap;
     let value = annotation.av;
     let value_ofn = annotation_transducer::translate_annotation_value(&value);
-    let value_ldtab = wiring_rs::ofn2ldtab::annotation_translation::translate_value(&value_ofn);
-    let value_datatype = wiring_rs::ofn2ldtab::util::translate_datatype(&value_ofn);
+    let value_ldtab = wiring_rs::ofn_2_ldtab::annotation_translation::translate_value(&value_ofn);
+    let value_datatype = wiring_rs::ofn_2_ldtab::util::translate_datatype(&value_ofn);
 
     //TODO: recrusive annotations (currently not supported in horned OWL)
     //TODO: sort this
@@ -94,7 +135,7 @@ pub fn owl_2_thick(annotated_axiom : &AnnotatedAxiom<RcStr>) -> Value {
     println!("1 OFN: {}", ofn);
 
     //OFN S-expression to LDTab ThickTriple
-    let thick_triple = wiring_rs::ofn2ldtab::ofn_parser::translate_triple(&ofn);
+    let thick_triple = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
     thick_triple
 }
