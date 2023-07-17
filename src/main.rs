@@ -1,4 +1,6 @@
-use horned_owl::command::parse_path;
+use horned_owl::io::ParserConfiguration;
+use horned_bin::parse_path;
+
 use std::path::Path;
 use std::env;
 use horned_owl::ontology::set::SetOntology;
@@ -24,7 +26,7 @@ fn main() {
 
     let args: Vec<String> = env::args().collect();
 
-    match parse_path(Path::new(&args[1])) {
+    match parse_path(Path::new(&args[1]), ParserConfiguration::default()) {
         Ok(parsed) => {
                 let ont = &parsed.decompose().0;
 
@@ -48,6 +50,7 @@ fn demo(ontology : &SetOntology<RcStr>)  {
         let ofn = owl_2_ofn::transducer::translate(ann_axiom);
         let ofn =
         match ofn[0].as_str() {
+
             Some("Import") => Value::Array(vec![ofn[0].clone(), iri_value.clone(), ofn[1].clone()]),
             Some("OntologyAnnotation") => Value::Array(vec![ofn[0].clone(), iri_value.clone(), ofn[1].clone()]) ,
             _ => ofn.clone() 

@@ -2,13 +2,12 @@ use serde_json::{Value};
 use serde_json::json; 
 use horned_owl::model::{IRI, AnnotatedAxiom, Ontology, Axiom, Import, OntologyAnnotation, RcStr};
 use horned_owl::ontology::set::SetOntology;
-
-
+use horned_owl::io::ParserConfiguration;
 use crate::owl_2_ofn::transducer as owl2ofn; 
 use crate::ofn_2_owl::transducer as ofn2owl; 
 use crate::owl_2_ofn::annotation_transducer as annotation_transducer; 
 use std::collections::HashSet;
-use horned_owl::command::parse_path;
+use horned_bin::parse_path;
 use std::path::Path;
 
 extern crate wiring_rs; 
@@ -17,7 +16,7 @@ extern crate wiring_rs;
 //Ideally, this would return a stream
 pub fn import(path : &str) -> HashSet<String> {
 
-    match parse_path(Path::new(path)) {
+    match parse_path(Path::new(path), ParserConfiguration::default()) {
         Ok(parsed) => {
                 let ont = &parsed.decompose().0;
 
