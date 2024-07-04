@@ -1,6 +1,7 @@
 use serde_json::{Value};
 use serde_json::json; 
-use horned_owl::model::{Class, ClassExpression, NamedIndividual, ObjectProperty, ObjectPropertyExpression, SubObjectPropertyExpression, Individual, AnonymousIndividual, DataProperty, DataRange, Datatype, Literal, FacetRestriction, Facet, PropertyExpression, RcStr};
+use horned_owl::model::{Class, ClassExpression, NamedIndividual, ObjectProperty, ObjectPropertyExpression, SubObjectPropertyExpression, Individual, AnonymousIndividual, DataProperty, DataRange, Datatype, Literal, FacetRestriction, PropertyExpression, RcStr};
+use horned_owl::vocab::Facet;
 
 pub fn translate_sub_object_property_expression(expression: &SubObjectPropertyExpression<RcStr>) -> Value {
      match expression {
@@ -369,4 +370,3 @@ pub fn translate_class_expression(expression: &ClassExpression<RcStr>) -> Value 
          ClassExpression::DataExactCardinality{n, dp,dr} => translate_data_cardinality("DataExactCardinality", &n, &dp, &dr), 
     }
 }
-

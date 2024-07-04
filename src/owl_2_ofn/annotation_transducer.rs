@@ -29,6 +29,7 @@ pub fn translate_annotation_value(value : &AnnotationValue<RcStr>) -> Value {
     match value {
         AnnotationValue::Literal(x) => expression_transducer::translate_literal(x),
         AnnotationValue::IRI(x) => json!(x.get(0..)),
+        AnnotationValue::AnonymousIndividual(x) =>  expression_transducer::translate_anonymous_individual(x),
     } 
 }
 

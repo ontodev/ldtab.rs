@@ -2,7 +2,7 @@ use serde_json::{Value};
 use serde_json::json; 
 use crate::owl_2_ofn::expression_transducer as expression_transducer;
 use crate::owl_2_ofn::annotation_transducer as annotation_transducer;
-use horned_owl::model::{Axiom, SubClassOf, ClassAssertion, DeclareClass, DeclareObjectProperty, DeclareDatatype, DeclareDataProperty, DeclareNamedIndividual, DisjointClasses, DisjointUnion, EquivalentClasses, EquivalentObjectProperties, ObjectPropertyDomain, ObjectPropertyExpression, SubObjectPropertyOf, TransitiveObjectProperty, ObjectPropertyAssertion, ReflexiveObjectProperty, IrreflexiveObjectProperty, SymmetricObjectProperty, AsymmetricObjectProperty, ObjectPropertyRange, InverseObjectProperties, FunctionalObjectProperty, InverseFunctionalObjectProperty, DisjointObjectProperties, Import, SubDataPropertyOf, EquivalentDataProperties, DisjointDataProperties, DataPropertyDomain, DataPropertyRange, FunctionalDataProperty, DatatypeDefinition, HasKey, SameIndividual, DifferentIndividuals, NegativeObjectPropertyAssertion, DataPropertyAssertion, NegativeDataPropertyAssertion, AnnotationAssertion, OntologyAnnotation, DeclareAnnotationProperty, SubAnnotationPropertyOf, AnnotationPropertyDomain, AnnotationPropertyRange, RcStr};
+use horned_owl::model::{Component, SubClassOf, ClassAssertion, DeclareClass, DeclareObjectProperty, DeclareDatatype, DeclareDataProperty, DeclareNamedIndividual, DisjointClasses, DisjointUnion, EquivalentClasses, EquivalentObjectProperties, ObjectPropertyDomain, ObjectPropertyExpression, SubObjectPropertyOf, TransitiveObjectProperty, ObjectPropertyAssertion, ReflexiveObjectProperty, IrreflexiveObjectProperty, SymmetricObjectProperty, AsymmetricObjectProperty, ObjectPropertyRange, InverseObjectProperties, FunctionalObjectProperty, InverseFunctionalObjectProperty, DisjointObjectProperties, Import, SubDataPropertyOf, EquivalentDataProperties, DisjointDataProperties, DataPropertyDomain, DataPropertyRange, FunctionalDataProperty, DatatypeDefinition, HasKey, SameIndividual, DifferentIndividuals, NegativeObjectPropertyAssertion, DataPropertyAssertion, NegativeDataPropertyAssertion, AnnotationAssertion, OntologyAnnotation, DeclareAnnotationProperty, SubAnnotationPropertyOf, AnnotationPropertyDomain, AnnotationPropertyRange, RcStr};
 
 
 ///Translates an OWL axiom into an OFN S-expression
@@ -15,61 +15,64 @@ use horned_owl::model::{Axiom, SubClassOf, ClassAssertion, DeclareClass, Declare
 ///                        sup : sup};
 /// let ofn = translate(&axiom);
 /// println("{}", ofn);
-pub fn translate(axiom : &Axiom<RcStr>) -> Value {
+pub fn translate(axiom : &Component<RcStr>) -> Value {
 
     match axiom {
-        Axiom::OntologyAnnotation(x) => translate_ontology_annotation(x),
-        Axiom::Import(x) => translate_import(x),
+        Component::OntologyAnnotation(x) => translate_ontology_annotation(x),
+        Component::Import(x) => translate_import(x),
 
-        Axiom::DeclareClass(x) => translate_class_declaration(x),
-        Axiom::DeclareObjectProperty(x) => translate_object_property_declaration(x),
-        Axiom::DeclareAnnotationProperty(x) => translate_declare_annotation_property(x),
-        Axiom::DeclareDataProperty(x) => translate_data_property_declaration(x),
-        Axiom::DeclareNamedIndividual(x) => translate_named_individual_declaration(x),
-        Axiom::DeclareDatatype(x) => translate_datatype_declaration(x),
+        Component::DeclareClass(x) => translate_class_declaration(x),
+        Component::DeclareObjectProperty(x) => translate_object_property_declaration(x),
+        Component::DeclareAnnotationProperty(x) => translate_declare_annotation_property(x),
+        Component::DeclareDataProperty(x) => translate_data_property_declaration(x),
+        Component::DeclareNamedIndividual(x) => translate_named_individual_declaration(x),
+        Component::DeclareDatatype(x) => translate_datatype_declaration(x),
 
-        Axiom::SubClassOf(x) => translate_subclass_of(x),
-        Axiom::EquivalentClasses(x) => translate_equivalent_classes(x),
-        Axiom::DisjointClasses(x) => translate_disjoint_classes(x),
-        Axiom::DisjointUnion(x) => translate_disjoint_union(x),
+        Component::SubClassOf(x) => translate_subclass_of(x),
+        Component::EquivalentClasses(x) => translate_equivalent_classes(x),
+        Component::DisjointClasses(x) => translate_disjoint_classes(x),
+        Component::DisjointUnion(x) => translate_disjoint_union(x),
 
-        Axiom::SubObjectPropertyOf(x) => translate_sub_object_property(x),
-        Axiom::EquivalentObjectProperties(x) => translate_equivalent_object_properties(x),
-        Axiom::DisjointObjectProperties(x) => translate_disjoint_object_properties(x),
-        Axiom::InverseObjectProperties(x) => translate_inverse_properties(x),
-        Axiom::ObjectPropertyDomain(x) => translate_object_property_domain(x),
-        Axiom::ObjectPropertyRange(x) => translate_object_property_range(x),
-        Axiom::FunctionalObjectProperty(x) => translate_functional_object_property(x),
-        Axiom::InverseFunctionalObjectProperty(x) => translate_inverse_functional_object_property(x),
-        Axiom::ReflexiveObjectProperty(x) => translate_reflexive_object_property(x),
-        Axiom::IrreflexiveObjectProperty(x) => translate_irreflexive_object_property(x),
-        Axiom::SymmetricObjectProperty(x) => translate_symmetric_object_property(x),
-        Axiom::AsymmetricObjectProperty(x) => translate_asymmetric_object_property(x),
-        Axiom::TransitiveObjectProperty(x) => translate_transitive_object_property(x),
+        Component::SubObjectPropertyOf(x) => translate_sub_object_property(x),
+        Component::EquivalentObjectProperties(x) => translate_equivalent_object_properties(x),
+        Component::DisjointObjectProperties(x) => translate_disjoint_object_properties(x),
+        Component::InverseObjectProperties(x) => translate_inverse_properties(x),
+        Component::ObjectPropertyDomain(x) => translate_object_property_domain(x),
+        Component::ObjectPropertyRange(x) => translate_object_property_range(x),
+        Component::FunctionalObjectProperty(x) => translate_functional_object_property(x),
+        Component::InverseFunctionalObjectProperty(x) => translate_inverse_functional_object_property(x),
+        Component::ReflexiveObjectProperty(x) => translate_reflexive_object_property(x),
+        Component::IrreflexiveObjectProperty(x) => translate_irreflexive_object_property(x),
+        Component::SymmetricObjectProperty(x) => translate_symmetric_object_property(x),
+        Component::AsymmetricObjectProperty(x) => translate_asymmetric_object_property(x),
+        Component::TransitiveObjectProperty(x) => translate_transitive_object_property(x),
 
-        Axiom::SubDataPropertyOf(x) => translate_sub_data_property_of(x),
-        Axiom::EquivalentDataProperties(x) => translate_equivalent_data_properties(x),
-        Axiom::DisjointDataProperties(x) => translate_disjoint_data_properties(x),
-        Axiom::DataPropertyDomain(x) => translate_data_property_domain(x),
-        Axiom::DataPropertyRange(x) => translate_data_property_range(x),
-        Axiom::FunctionalDataProperty(x) => translate_functional_data_property(x),
+        Component::SubDataPropertyOf(x) => translate_sub_data_property_of(x),
+        Component::EquivalentDataProperties(x) => translate_equivalent_data_properties(x),
+        Component::DisjointDataProperties(x) => translate_disjoint_data_properties(x),
+        Component::DataPropertyDomain(x) => translate_data_property_domain(x),
+        Component::DataPropertyRange(x) => translate_data_property_range(x),
+        Component::FunctionalDataProperty(x) => translate_functional_data_property(x),
 
-        Axiom::DatatypeDefinition(x) => translate_datatype_definition(x),
-        Axiom::HasKey(x) => translate_has_key(x),
+        Component::DatatypeDefinition(x) => translate_datatype_definition(x),
+        Component::HasKey(x) => translate_has_key(x),
 
-        Axiom::SameIndividual(x) => translate_same_individual(x),
-        Axiom::DifferentIndividuals(x) => translate_different_individuals(x),
+        Component::SameIndividual(x) => translate_same_individual(x),
+        Component::DifferentIndividuals(x) => translate_different_individuals(x),
 
-        Axiom::ClassAssertion(x) => translate_class_assertion(x),
-        Axiom::ObjectPropertyAssertion(x) => translate_object_property_assertion(x),
-        Axiom::NegativeObjectPropertyAssertion(x) => translate_negative_object_property_assertion(x),
-        Axiom::DataPropertyAssertion(x) => translate_data_property_assertion(x),
-        Axiom::NegativeDataPropertyAssertion(x) => translate_negative_data_property_assertion(x),
+        Component::ClassAssertion(x) => translate_class_assertion(x),
+        Component::ObjectPropertyAssertion(x) => translate_object_property_assertion(x),
+        Component::NegativeObjectPropertyAssertion(x) => translate_negative_object_property_assertion(x),
+        Component::DataPropertyAssertion(x) => translate_data_property_assertion(x),
+        Component::NegativeDataPropertyAssertion(x) => translate_negative_data_property_assertion(x),
 
-        Axiom::AnnotationAssertion(x) => translate_annotation_assertion(x),
-        Axiom::SubAnnotationPropertyOf(x) => translate_sub_annotation_property_of(x), 
-        Axiom::AnnotationPropertyDomain(x) => translate_annotation_property_domain(x),
-        Axiom::AnnotationPropertyRange(x) => translate_annotation_property_range(x), 
+        Component::AnnotationAssertion(x) => translate_annotation_assertion(x),
+        Component::SubAnnotationPropertyOf(x) => translate_sub_annotation_property_of(x), 
+        Component::AnnotationPropertyDomain(x) => translate_annotation_property_domain(x),
+        Component::AnnotationPropertyRange(x) => translate_annotation_property_range(x), 
+        Component::Rule(_) => Value::Null,
+        Component::OntologyID(_) => Value::Null,
+        Component::DocIRI(_) => Value::Null,
     } 
 }
 
@@ -489,6 +492,3 @@ pub fn translate_annotation_property_range(axiom : &AnnotationPropertyRange<RcSt
     let v = vec![operator, property, iri];
     Value::Array(v) 
 }
-
-
-

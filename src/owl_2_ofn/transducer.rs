@@ -2,11 +2,11 @@ use serde_json::{Value};
 use serde_json::json; 
 use crate::owl_2_ofn::axiom_transducer as axiom_transducer;
 use crate::owl_2_ofn::annotation_transducer as annotation_transducer;
-use horned_owl::model::{AnnotatedAxiom, RcStr};
+use horned_owl::model::{AnnotatedComponent, RcStr};
 
-pub fn translate(axiom : &AnnotatedAxiom<RcStr>) -> Value {
+pub fn translate(axiom : &AnnotatedComponent<RcStr>) -> Value {
 
-    let mut logical_axiom = axiom_transducer::translate(&axiom.axiom);
+    let mut logical_axiom = axiom_transducer::translate(&axiom.component);
     let annotations = &axiom.ann;
 
     if !annotations.is_empty() { 

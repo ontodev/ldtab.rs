@@ -19,7 +19,7 @@ pub mod ofn_2_owl;
 pub mod import;
 extern crate wiring_rs;
 
-pub mod round;
+//pub mod round;
 
 
 fn main() {
@@ -39,8 +39,9 @@ fn main() {
 
 fn demo(ontology : &SetOntology<RcStr>)  {
 
-    let id = ontology.id();
-    let iri = id.clone().iri.unwrap(); 
+    let id = ontology.i();
+    let iri = id.clone().the_ontology_id().unwrap().iri.unwrap();
+    //let iri = id.clone().iri.unwrap(); 
     let iri_value = Value::String(String::from(iri.get(0..).unwrap()));
 
     for ann_axiom in ontology.iter() { 

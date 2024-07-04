@@ -1,7 +1,7 @@
 use serde_json::{Value};
 use crate::ofn_2_owl::axiom_transducer as axiom_transducer;
 use crate::ofn_2_owl::annotation_transducer as annotation_transducer;
-use horned_owl::model::{AnnotatedAxiom, RcStr};
+use horned_owl::model::{AnnotatedComponent, RcStr};
 use std::collections::BTreeSet;
 
 
@@ -16,7 +16,7 @@ use std::collections::BTreeSet;
 ///
 /// println!("{:?}", axiom); 
 
-pub fn translate(ofn : &Value) -> AnnotatedAxiom<RcStr> {
+pub fn translate(ofn : &Value) -> AnnotatedComponent<RcStr> {
 
     //split logic from annotation
     let owl = get_owl(ofn);
@@ -33,7 +33,7 @@ pub fn translate(ofn : &Value) -> AnnotatedAxiom<RcStr> {
     }
 
     //merge logical and annotation component
-    let annotated_axiom = AnnotatedAxiom{axiom : axiom,
+    let annotated_axiom = AnnotatedComponent{component : axiom,
                                          ann: annotation_set};
 
     annotated_axiom 
