@@ -17,3 +17,8 @@ im = "15.1.0"
 itertools = "0.10.3"
 rio_api = "0.7.1"
 rio_xml = "0.7.3"
+clap = { version = "4.5.11", features = ["cargo", "derive"] }
+sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio-native-tls"] }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0.86"
+csv = "1.1"
