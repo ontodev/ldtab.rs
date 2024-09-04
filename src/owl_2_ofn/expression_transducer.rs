@@ -201,6 +201,18 @@ pub fn translate_object_has_self(property: &ObjectPropertyExpression<RcStr>) -> 
     Value::Array(res)
 }
 
+
+fn is_owl_thing(value: &Value) -> bool {
+    // OWL:Thing as a string (IRI)
+    let owl_thing_iri = "<http://www.w3.org/2002/07/owl#Thing>";
+
+    // Check if the serde_json::Value is a string and compare it to OWL:Thing IRI
+    match value {
+        Value::String(iri) => iri == owl_thing_iri,
+        _ => false,
+    }
+}
+
 pub fn translate_object_cardinality(
     operator: &str,
     cardinality: &u32,
@@ -217,7 +229,10 @@ pub fn translate_object_cardinality(
     let mut res = vec![operator];
     res.push(cardinality);
     res.push(property);
-    res.push(filler);
+
+    if filler != Value::Null && !is_owl_thing(&filler) {
+        res.push(filler);
+    } 
 
     Value::Array(res)
 }
@@ -373,6 +388,18 @@ pub fn translate_data_has_value(property: &DataProperty<RcStr>, literal: &Litera
     Value::Array(res)
 }
 
+
+fn is_rdfs_literal(value: &Value) -> bool {
+    // RDFS:Literal as a string (IRI)
+    let rdfs_literal_iri = "<http://www.w3.org/2000/01/rdf-schema#Literal>";
+
+    // Check if the serde_json::Value is a string and compare it to RDFS:Literal IRI
+    match value {
+        Value::String(iri) => iri == rdfs_literal_iri,
+        _ => false,
+    }
+}
+
 pub fn translate_data_cardinality(
     operator: &str,
     cardinality: &u32,
@@ -387,7 +414,10 @@ pub fn translate_data_cardinality(
     let mut res = vec![operator];
     res.push(cardinality);
     res.push(property);
-    res.push(filler);
+
+    if filler != Value::Null && !is_rdfs_literal(&filler) {
+        res.push(filler);
+    } 
 
     Value::Array(res)
 }
