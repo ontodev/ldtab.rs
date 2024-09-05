@@ -499,7 +499,9 @@ pub fn translate_sub_annotation_property_of(axiom: &SubAnnotationPropertyOf<RcSt
 pub fn translate_annotation_property_domain(axiom: &AnnotationPropertyDomain<RcStr>) -> Value {
     let operator = Value::String(String::from("AnnotationPropertyDomain"));
     let property = annotation_transducer::translate_annotation_property(&axiom.ap);
-    let iri = json!(axiom.iri.get(0..));
+    let i = axiom.iri.get(0..);
+    let iri = "<".to_string() + i.unwrap() + ">";
+    let iri = json!(iri);
     let v = vec![operator, property, iri];
     Value::Array(v)
 }
@@ -507,21 +509,28 @@ pub fn translate_annotation_property_domain(axiom: &AnnotationPropertyDomain<RcS
 pub fn translate_annotation_property_range(axiom: &AnnotationPropertyRange<RcStr>) -> Value {
     let operator = Value::String(String::from("AnnotationPropertyRange"));
     let property = annotation_transducer::translate_annotation_property(&axiom.ap);
-    let iri = json!(axiom.iri.get(0..));
+    let i = axiom.iri.get(0..);
+    let iri = "<".to_string() + i.unwrap() + ">";
+    let iri = json!(iri);
     let v = vec![operator, property, iri];
     Value::Array(v)
 }
 
 pub fn translate_doc_iri(axiom: &DocIRI<RcStr>) -> Value {
     let operator = Value::String(String::from("DocIRI")); // this is not specified in OWL
-    let iri = json!(axiom.0.get(0..));
+    let i = axiom.0.get(0..);
+    let iri = "<".to_string() + i.unwrap() + ">";
+    let iri = json!(iri);
     let v = vec![operator, iri];
     Value::Array(v)
 }
 
 pub fn translate_ontology_id(axiom: &OntologyID<RcStr>) -> Value {
     let operator = Value::String(String::from("Ontology"));
-    let iri = json!(axiom.iri.clone().unwrap().get(0..));
+    let i = axiom.iri.clone().unwrap();
+    let ii = i.get(0..);
+    let iri = "<".to_string() + ii.unwrap() + ">";
+    let iri = json!(iri);
     let v = vec![operator, iri];
     Value::Array(v)
 }
