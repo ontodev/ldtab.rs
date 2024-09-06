@@ -531,6 +531,12 @@ pub fn translate_ontology_id(axiom: &OntologyID<RcStr>) -> Value {
     let ii = i.get(0..);
     let iri = "<".to_string() + ii.unwrap() + ">";
     let iri = json!(iri);
-    let v = vec![operator, iri];
+
+    let version = axiom.viri.clone().unwrap();
+    let vi = version.get(0..);
+    let viri = "<".to_string() + vi.unwrap() + ">";
+    let viri = json!(viri);
+
+    let v = vec![operator, iri, viri];
     Value::Array(v)
 }
