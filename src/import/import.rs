@@ -6,6 +6,7 @@ use horned_owl::model::*;
 use horned_owl::ontology::set::SetOntology;
 use regex::Regex;
 use serde_json::Value;
+use serde_json::json;
 use sqlx::{sqlite::SqlitePoolOptions, QueryBuilder, Row, SqlitePool};
 use std::collections::HashMap;
 use std::path::Path;
@@ -82,6 +83,7 @@ async fn import_ontology(ontology: &SetOntology<RcStr>, pool: &SqlitePool) -> Re
     let count = ontology.iter().count();
     println!("Number of axioms: {}", count);
     for ann_axiom in ontology.iter() {
+
         //1. translate Horned OWL to OFN S-expression
         let ofn = owl_2_ofn::transducer::translate(ann_axiom);
         let ofn = match ofn[0].as_str() {
@@ -97,6 +99,15 @@ async fn import_ontology(ontology: &SetOntology<RcStr>, pool: &SqlitePool) -> Re
 
         //2. translate OFN S-Expression to LDTab ThickTriple
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn_curified);
+
+        //An "Ontology" object in Horned-OWL gets translated into two LDTab triples
+        if ldtab["predicate"] == "owl:versionIRI" {
+            let mut t = ldtab.clone();
+            t["predicate"] = json!("rdf:type");
+            t["object"] = json!("owl:Ontology");
+
+            ldtab_triples.push(ldtab_2_tuple(&t).unwrap());
+        }
 
         let ldtab_tuple = ldtab_2_tuple(&ldtab).unwrap();
 
