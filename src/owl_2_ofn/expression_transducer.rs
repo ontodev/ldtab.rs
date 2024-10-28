@@ -1,7 +1,7 @@
 use horned_owl::model::{
     AnonymousIndividual, Class, ClassExpression, DataProperty, DataRange, Datatype,
     FacetRestriction, Individual, Literal, NamedIndividual, ObjectProperty,
-    ObjectPropertyExpression, PropertyExpression, RcStr, SubObjectPropertyExpression,
+    ObjectPropertyExpression, PropertyExpression, RcStr, SubObjectPropertyExpression, Atom, IArgument, DArgument
 };
 use horned_owl::vocab::Facet;
 use serde_json::json;
@@ -421,6 +421,96 @@ pub fn translate_data_cardinality(
 
     Value::Array(res)
 }
+
+pub fn translate_atom(atom: &Atom<RcStr>) -> Value {
+    match atom {
+        Atom::BuiltInAtom { pred, args } => {
+            let operator = Value::String(String::from("BuiltInAtom"));
+
+            let a = pred.get(0..);
+            let pred = Value::String(String::from(a.unwrap()));
+            let mut dargs = Vec::new();
+            for darg in args {
+                dargs.push(translate_darg(darg));
+            }
+
+            let mut v = vec![operator, pred];
+            v.extend(dargs);
+            Value::Array(v)
+        },
+        Atom::ClassAtom{ pred, arg } => {
+            let operator = Value::String(String::from("ClassAtom"));
+            let expression = translate_class_expression(pred);
+            let arg = translate_iarg(arg);
+
+            let v = vec![operator, expression, arg];
+            Value::Array(v)
+        },
+        Atom::DataPropertyAtom{ pred, args } => {
+            let operator = Value::String(String::from("DataPropertyAtom"));
+            let property = translate_data_property(pred);
+            let arg1 = translate_darg(&args.0);
+            let arg2 = translate_darg(&args.1);
+
+            let v = vec![operator, property, arg1, arg2];
+            Value::Array(v)
+        },
+        Atom::DataRangeAtom{ pred, arg } => {
+            let operator = Value::String(String::from("DataRangeAtom"));
+            let range = translate_data_range(pred);
+            let arg = translate_darg(arg);
+
+            let v = vec![operator, range, arg];
+            Value::Array(v)
+        },
+        Atom::DifferentIndividualsAtom( arg1, arg2 ) => {
+            let operator = Value::String(String::from("DifferentIndividualsAtom"));
+            let v = vec![operator, translate_iarg(arg1), translate_iarg(arg2)];
+            Value::Array(v)
+        },
+        Atom::ObjectPropertyAtom{ pred, args } => {
+            let operator = Value::String(String::from("ObjectPropertyAtom"));
+            let property = translate_object_property_expression(pred);
+            let arg1 = translate_iarg(&args.0);
+            let arg2 = translate_iarg(&args.1);
+
+            let v = vec![operator, property, arg1, arg2];
+            Value::Array(v)
+        },
+        Atom::SameIndividualAtom( arg1, arg2 ) => {
+            let operator = Value::String(String::from("SameIndividualAtom"));
+            let v = vec![operator, translate_iarg(arg1), translate_iarg(arg2)];
+            Value::Array(v)
+        }
+    }
+}
+
+pub fn translate_iarg(iarg: &IArgument<RcStr>) -> Value {
+    match iarg {
+        IArgument::Variable(x) => {
+            let operator = Value::String(String::from("Variable"));
+            let v = vec![operator, Value::String(String::from(x))]; 
+            Value::Array(v)
+        }
+        IArgument::Individual(x) => {
+            translate_individual(x)
+        }
+    }
+}
+
+pub fn translate_darg(darg: &DArgument<RcStr>) -> Value {
+    match darg {
+        DArgument::Variable(x) => {
+            let operator = Value::String(String::from("Variable"));
+            let v = vec![operator, Value::String(String::from(x))]; 
+            Value::Array(v)
+        }
+        DArgument::Literal(x) => {
+            translate_literal(x)
+        }
+    }
+}
+
 
 pub fn translate_class_expression(expression: &ClassExpression<RcStr>) -> Value {
     match expression {

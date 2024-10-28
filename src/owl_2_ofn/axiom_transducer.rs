@@ -13,7 +13,7 @@ use horned_owl::model::{
     ObjectPropertyDomain, ObjectPropertyExpression, ObjectPropertyRange, OntologyAnnotation,
     OntologyID, RcStr, ReflexiveObjectProperty, SameIndividual, SubAnnotationPropertyOf,
     SubClassOf, SubDataPropertyOf, SubObjectPropertyOf, SymmetricObjectProperty,
-    TransitiveObjectProperty,
+    TransitiveObjectProperty, Rule,
 };
 use serde_json::json;
 use serde_json::Value;
@@ -90,7 +90,7 @@ pub fn translate(axiom: &Component<RcStr>) -> Value {
         Component::AnnotationPropertyRange(x) => translate_annotation_property_range(x),
         Component::OntologyID(x) => translate_ontology_id(x),
         Component::DocIRI(x) => translate_doc_iri(x),
-        Component::Rule(_) => Value::Null, //TODO
+        Component::Rule(x) => translate_rule(x), 
     }
 }
 
@@ -524,6 +524,28 @@ pub fn translate_doc_iri(axiom: &DocIRI<RcStr>) -> Value {
     let v = vec![operator, iri];
     Value::Array(v)
 }
+
+pub fn translate_rule(axiom: &Rule<RcStr>) -> Value {
+    let operator = Value::String(String::from("DLSafeRule")); 
+
+    //translate body
+    let mut body = Vec::new();
+    body.push( Value::String(String::from("Body")));
+    for atom in axiom.body.clone() { 
+        body.push(expression_transducer::translate_atom(&atom));
+    }
+
+    //translate head
+    let mut head = Vec::new();
+    head.push( Value::String(String::from("Head")));
+    for atom in axiom.head.clone() { 
+        head.push(expression_transducer::translate_atom(&atom));
+    }
+
+    let v = vec![operator, Value::Array(body), Value::Array(head)];
+    Value::Array(v)
+}
+
 
 pub fn translate_ontology_id(axiom: &OntologyID<RcStr>) -> Value {
     let operator = Value::String(String::from("Ontology"));
