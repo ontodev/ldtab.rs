@@ -1,12 +1,12 @@
 use crate::owl_2_ofn::expression_transducer;
 use horned_owl::model::{
-    Annotation, AnnotationProperty, AnnotationSubject, AnnotationValue, RcStr,
+    Annotation, AnnotationProperty, AnnotationSubject, AnnotationValue, ArcStr,
 };
 use serde_json::json;
 use serde_json::Value;
 use std::collections::BTreeSet;
 
-pub fn translate_annotation(annotation: &Annotation<RcStr>) -> Value {
+pub fn translate_annotation(annotation: &Annotation<ArcStr>) -> Value {
     let operator = Value::String(String::from("Annotation"));
     let property = translate_annotation_property(&annotation.ap);
     let value = translate_annotation_value(&annotation.av);
@@ -14,7 +14,7 @@ pub fn translate_annotation(annotation: &Annotation<RcStr>) -> Value {
     Value::Array(res)
 }
 
-pub fn translate_annotation_subject(annotation_subject: &AnnotationSubject<RcStr>) -> Value {
+pub fn translate_annotation_subject(annotation_subject: &AnnotationSubject<ArcStr>) -> Value {
     match annotation_subject {
         AnnotationSubject::IRI(x) => {
             let i = x.get(0..);
@@ -27,13 +27,13 @@ pub fn translate_annotation_subject(annotation_subject: &AnnotationSubject<RcStr
     }
 }
 
-pub fn translate_annotation_property(property: &AnnotationProperty<RcStr>) -> Value {
+pub fn translate_annotation_property(property: &AnnotationProperty<ArcStr>) -> Value {
     let a = property.0.get(0..);
     let iri = "<".to_string() + a.unwrap() + ">";
     json!(iri)
 }
 
-pub fn translate_annotation_value(value: &AnnotationValue<RcStr>) -> Value {
+pub fn translate_annotation_value(value: &AnnotationValue<ArcStr>) -> Value {
     match value {
         AnnotationValue::Literal(x) => expression_transducer::translate_literal(x),
         AnnotationValue::IRI(x) => {
@@ -47,7 +47,7 @@ pub fn translate_annotation_value(value: &AnnotationValue<RcStr>) -> Value {
     }
 }
 
-pub fn translate_annotation_set(annotation_set: &BTreeSet<Annotation<RcStr>>) -> Vec<Value> {
+pub fn translate_annotation_set(annotation_set: &BTreeSet<Annotation<ArcStr>>) -> Vec<Value> {
     let mut res = Vec::new();
     for annotation in annotation_set {
         res.push(translate_annotation(annotation));

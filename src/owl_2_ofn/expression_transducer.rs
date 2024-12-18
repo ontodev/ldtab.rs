@@ -1,14 +1,14 @@
 use horned_owl::model::{
-    AnonymousIndividual, Class, ClassExpression, DataProperty, DataRange, Datatype,
-    FacetRestriction, Individual, Literal, NamedIndividual, ObjectProperty,
-    ObjectPropertyExpression, PropertyExpression, RcStr, SubObjectPropertyExpression, Atom, IArgument, DArgument
+    AnonymousIndividual, Atom, Class, ClassExpression, DArgument, DataProperty, DataRange,
+    Datatype, FacetRestriction, IArgument, Individual, Literal, NamedIndividual, ObjectProperty,
+    ObjectPropertyExpression, PropertyExpression, ArcStr, SubObjectPropertyExpression,
 };
 use horned_owl::vocab::Facet;
 use serde_json::json;
 use serde_json::Value;
 
 pub fn translate_sub_object_property_expression(
-    expression: &SubObjectPropertyExpression<RcStr>,
+    expression: &SubObjectPropertyExpression<ArcStr>,
 ) -> Value {
     match expression {
         SubObjectPropertyExpression::ObjectPropertyChain(x) => {
@@ -26,7 +26,7 @@ pub fn translate_sub_object_property_expression(
     }
 }
 
-pub fn translate_property_expression(expression: &PropertyExpression<RcStr>) -> Value {
+pub fn translate_property_expression(expression: &PropertyExpression<ArcStr>) -> Value {
     match expression {
         PropertyExpression::ObjectPropertyExpression(x) => translate_object_property_expression(&x),
         PropertyExpression::DataProperty(x) => translate_data_property(&x),
@@ -34,14 +34,14 @@ pub fn translate_property_expression(expression: &PropertyExpression<RcStr>) -> 
     }
 }
 
-pub fn translate_object_property_expression(expression: &ObjectPropertyExpression<RcStr>) -> Value {
+pub fn translate_object_property_expression(expression: &ObjectPropertyExpression<ArcStr>) -> Value {
     match expression {
         ObjectPropertyExpression::ObjectProperty(x) => translate_object_property(&x),
         ObjectPropertyExpression::InverseObjectProperty(x) => translate_inverse_object_property(&x),
     }
 }
 
-pub fn translate_inverse_object_property(property: &ObjectProperty<RcStr>) -> Value {
+pub fn translate_inverse_object_property(property: &ObjectProperty<ArcStr>) -> Value {
     let operator = Value::String(String::from("ObjectInverseOf"));
     let mut res = vec![operator];
 
@@ -53,46 +53,46 @@ pub fn translate_inverse_object_property(property: &ObjectProperty<RcStr>) -> Va
     Value::Array(res)
 }
 
-pub fn translate_object_property(property: &ObjectProperty<RcStr>) -> Value {
+pub fn translate_object_property(property: &ObjectProperty<ArcStr>) -> Value {
     let a = property.0.get(0..);
     let iri = "<".to_string() + a.unwrap() + ">";
     json!(iri)
 }
 
-pub fn translate_data_property(property: &DataProperty<RcStr>) -> Value {
+pub fn translate_data_property(property: &DataProperty<ArcStr>) -> Value {
     let a = property.0.get(0..);
     let iri = "<".to_string() + a.unwrap() + ">";
     json!(iri)
 }
 
-pub fn translate_class(class: &Class<RcStr>) -> Value {
+pub fn translate_class(class: &Class<ArcStr>) -> Value {
     let a = class.0.get(0..);
     let iri = "<".to_string() + a.unwrap() + ">";
     json!(iri)
 }
 
 //TODO: not sure this is correct
-pub fn translate_anonymous_individual(a: &AnonymousIndividual<RcStr>) -> Value {
+pub fn translate_anonymous_individual(a: &AnonymousIndividual<ArcStr>) -> Value {
     let an = a.0.get(0..);
     let iri = "<".to_string() + an.unwrap() + ">";
     json!(iri)
 }
 
-pub fn translate_named_individual(a: &NamedIndividual<RcStr>) -> Value {
+pub fn translate_named_individual(a: &NamedIndividual<ArcStr>) -> Value {
     let an = a.0.get(0..);
     let iri = "<".to_string() + an.unwrap() + ">";
     json!(iri)
 }
 
 //TODO this is an IRI
-pub fn translate_individual(individual: &Individual<RcStr>) -> Value {
+pub fn translate_individual(individual: &Individual<ArcStr>) -> Value {
     match individual {
         Individual::Anonymous(x) => translate_anonymous_individual(&x),
         Individual::Named(x) => translate_named_individual(&x),
     }
 }
 
-pub fn translate_literal(literal: &Literal<RcStr>) -> Value {
+pub fn translate_literal(literal: &Literal<ArcStr>) -> Value {
     match literal {
         //we need to use double quotes here to mark a string as a literal
         Literal::Simple { literal } => json!(format!("\"{}\"", literal)),
@@ -111,7 +111,7 @@ pub fn translate_literal(literal: &Literal<RcStr>) -> Value {
     }
 }
 
-pub fn translate_n_ary_operator(operator: &str, arguments: &Vec<ClassExpression<RcStr>>) -> Value {
+pub fn translate_n_ary_operator(operator: &str, arguments: &Vec<ClassExpression<ArcStr>>) -> Value {
     let mut operands: Vec<Value> = arguments
         .into_iter()
         .map(|x| translate_class_expression(&x))
@@ -121,7 +121,7 @@ pub fn translate_n_ary_operator(operator: &str, arguments: &Vec<ClassExpression<
     Value::Array(operands)
 }
 
-pub fn translate_object_one_of(arguments: &Vec<Individual<RcStr>>) -> Value {
+pub fn translate_object_one_of(arguments: &Vec<Individual<ArcStr>>) -> Value {
     let mut operands: Vec<Value> = arguments
         .into_iter()
         .map(|x| translate_individual(&x))
@@ -131,8 +131,8 @@ pub fn translate_object_one_of(arguments: &Vec<Individual<RcStr>>) -> Value {
     Value::Array(operands)
 }
 
-pub fn translate_object_complement(argument: &Box<ClassExpression<RcStr>>) -> Value {
-    let expression: ClassExpression<RcStr> = *argument.clone();
+pub fn translate_object_complement(argument: &Box<ClassExpression<ArcStr>>) -> Value {
+    let expression: ClassExpression<ArcStr> = *argument.clone();
     let argument = translate_class_expression(&expression);
 
     let operator = Value::String(String::from("ObjectComplementOf"));
@@ -143,10 +143,10 @@ pub fn translate_object_complement(argument: &Box<ClassExpression<RcStr>>) -> Va
 }
 
 pub fn translate_object_some_values_from(
-    property: &ObjectPropertyExpression<RcStr>,
-    filler: &Box<ClassExpression<RcStr>>,
+    property: &ObjectPropertyExpression<ArcStr>,
+    filler: &Box<ClassExpression<ArcStr>>,
 ) -> Value {
-    let expression: ClassExpression<RcStr> = *filler.clone();
+    let expression: ClassExpression<ArcStr> = *filler.clone();
 
     let operator = Value::String(String::from("ObjectSomeValuesFrom"));
     let filler = translate_class_expression(&expression);
@@ -160,10 +160,10 @@ pub fn translate_object_some_values_from(
 }
 
 pub fn translate_object_all_values_from(
-    property: &ObjectPropertyExpression<RcStr>,
-    filler: &Box<ClassExpression<RcStr>>,
+    property: &ObjectPropertyExpression<ArcStr>,
+    filler: &Box<ClassExpression<ArcStr>>,
 ) -> Value {
-    let expression: ClassExpression<RcStr> = *filler.clone();
+    let expression: ClassExpression<ArcStr> = *filler.clone();
 
     let operator = Value::String(String::from("ObjectAllValuesFrom"));
     let filler = translate_class_expression(&expression);
@@ -177,8 +177,8 @@ pub fn translate_object_all_values_from(
 }
 
 pub fn translate_object_has_value(
-    property: &ObjectPropertyExpression<RcStr>,
-    value: &Individual<RcStr>,
+    property: &ObjectPropertyExpression<ArcStr>,
+    value: &Individual<ArcStr>,
 ) -> Value {
     let operator = Value::String(String::from("ObjectHasValue"));
     let value = translate_individual(value);
@@ -191,7 +191,7 @@ pub fn translate_object_has_value(
     Value::Array(res)
 }
 
-pub fn translate_object_has_self(property: &ObjectPropertyExpression<RcStr>) -> Value {
+pub fn translate_object_has_self(property: &ObjectPropertyExpression<ArcStr>) -> Value {
     let operator = Value::String(String::from("ObjectHasSelf"));
     let property = translate_object_property_expression(property);
 
@@ -200,7 +200,6 @@ pub fn translate_object_has_self(property: &ObjectPropertyExpression<RcStr>) -> 
 
     Value::Array(res)
 }
-
 
 fn is_owl_thing(value: &Value) -> bool {
     // OWL:Thing as a string (IRI)
@@ -216,10 +215,10 @@ fn is_owl_thing(value: &Value) -> bool {
 pub fn translate_object_cardinality(
     operator: &str,
     cardinality: &u32,
-    property: &ObjectPropertyExpression<RcStr>,
-    filler: &Box<ClassExpression<RcStr>>,
+    property: &ObjectPropertyExpression<ArcStr>,
+    filler: &Box<ClassExpression<ArcStr>>,
 ) -> Value {
-    let expression: ClassExpression<RcStr> = *filler.clone();
+    let expression: ClassExpression<ArcStr> = *filler.clone();
 
     let operator = Value::String(String::from(operator));
     let cardinality = json!(cardinality.to_string());
@@ -232,18 +231,18 @@ pub fn translate_object_cardinality(
 
     if filler != Value::Null && !is_owl_thing(&filler) {
         res.push(filler);
-    } 
+    }
 
     Value::Array(res)
 }
 
-pub fn translate_datatype(datatype: &Datatype<RcStr>) -> Value {
+pub fn translate_datatype(datatype: &Datatype<ArcStr>) -> Value {
     let a = datatype.0.get(0..);
     let iri = "<".to_string() + a.unwrap() + ">";
     json!(iri)
 }
 
-pub fn translate_data_intersection_of(arguments: &Vec<DataRange<RcStr>>) -> Value {
+pub fn translate_data_intersection_of(arguments: &Vec<DataRange<ArcStr>>) -> Value {
     let mut operands: Vec<Value> = arguments
         .into_iter()
         .map(|x| translate_data_range(&x))
@@ -253,7 +252,7 @@ pub fn translate_data_intersection_of(arguments: &Vec<DataRange<RcStr>>) -> Valu
     Value::Array(operands)
 }
 
-pub fn translate_data_union_of(arguments: &Vec<DataRange<RcStr>>) -> Value {
+pub fn translate_data_union_of(arguments: &Vec<DataRange<ArcStr>>) -> Value {
     let mut operands: Vec<Value> = arguments
         .into_iter()
         .map(|x| translate_data_range(&x))
@@ -263,8 +262,8 @@ pub fn translate_data_union_of(arguments: &Vec<DataRange<RcStr>>) -> Value {
     Value::Array(operands)
 }
 
-pub fn translate_data_complement_of(argument: &Box<DataRange<RcStr>>) -> Value {
-    let range: DataRange<RcStr> = *argument.clone();
+pub fn translate_data_complement_of(argument: &Box<DataRange<ArcStr>>) -> Value {
+    let range: DataRange<ArcStr> = *argument.clone();
     let argument = translate_data_range(&range);
 
     let operator = Value::String(String::from("DataComplementOf"));
@@ -274,7 +273,7 @@ pub fn translate_data_complement_of(argument: &Box<DataRange<RcStr>>) -> Value {
     Value::Array(res)
 }
 
-pub fn translate_data_one_of(arguments: &Vec<Literal<RcStr>>) -> Value {
+pub fn translate_data_one_of(arguments: &Vec<Literal<ArcStr>>) -> Value {
     let mut operands: Vec<Value> = arguments
         .into_iter()
         .map(|x| translate_literal(&x))
@@ -301,7 +300,7 @@ pub fn translate_facet(facet: &Facet) -> Value {
     }
 }
 
-pub fn translate_facet_restriction(facet_restriction: &FacetRestriction<RcStr>) -> Value {
+pub fn translate_facet_restriction(facet_restriction: &FacetRestriction<ArcStr>) -> Value {
     let operator = Value::String(String::from("FaceetRestriction"));
 
     let facet = facet_restriction.f.clone();
@@ -318,8 +317,8 @@ pub fn translate_facet_restriction(facet_restriction: &FacetRestriction<RcStr>) 
 }
 
 pub fn translate_datatype_restriction(
-    datatype: &Datatype<RcStr>,
-    facets: &Vec<FacetRestriction<RcStr>>,
+    datatype: &Datatype<ArcStr>,
+    facets: &Vec<FacetRestriction<ArcStr>>,
 ) -> Value {
     let operator = Value::String(String::from("DatatypeRestriction"));
     let datatype = translate_datatype(datatype);
@@ -333,7 +332,7 @@ pub fn translate_datatype_restriction(
     Value::Array(operands)
 }
 
-pub fn translate_data_range(range: &DataRange<RcStr>) -> Value {
+pub fn translate_data_range(range: &DataRange<ArcStr>) -> Value {
     match range {
         DataRange::Datatype(x) => translate_datatype(&x),
         DataRange::DataIntersectionOf(x) => translate_data_intersection_of(&x),
@@ -347,8 +346,8 @@ pub fn translate_data_range(range: &DataRange<RcStr>) -> Value {
 }
 
 pub fn translate_data_some_values_from(
-    property: &DataProperty<RcStr>,
-    filler: &DataRange<RcStr>,
+    property: &DataProperty<ArcStr>,
+    filler: &DataRange<ArcStr>,
 ) -> Value {
     let operator = Value::String(String::from("DataSomeValuesFrom"));
     let filler = translate_data_range(&filler);
@@ -362,8 +361,8 @@ pub fn translate_data_some_values_from(
 }
 
 pub fn translate_data_all_values_from(
-    property: &DataProperty<RcStr>,
-    filler: &DataRange<RcStr>,
+    property: &DataProperty<ArcStr>,
+    filler: &DataRange<ArcStr>,
 ) -> Value {
     let operator = Value::String(String::from("DataAllValuesFrom"));
     let filler = translate_data_range(&filler);
@@ -376,7 +375,7 @@ pub fn translate_data_all_values_from(
     Value::Array(res)
 }
 
-pub fn translate_data_has_value(property: &DataProperty<RcStr>, literal: &Literal<RcStr>) -> Value {
+pub fn translate_data_has_value(property: &DataProperty<ArcStr>, literal: &Literal<ArcStr>) -> Value {
     let operator = Value::String(String::from("ObjectAllValuesFrom"));
     let value = translate_literal(literal);
     let property = translate_data_property(property);
@@ -387,7 +386,6 @@ pub fn translate_data_has_value(property: &DataProperty<RcStr>, literal: &Litera
 
     Value::Array(res)
 }
-
 
 fn is_rdfs_literal(value: &Value) -> bool {
     // RDFS:Literal as a string (IRI)
@@ -403,8 +401,8 @@ fn is_rdfs_literal(value: &Value) -> bool {
 pub fn translate_data_cardinality(
     operator: &str,
     cardinality: &u32,
-    property: &DataProperty<RcStr>,
-    filler: &DataRange<RcStr>,
+    property: &DataProperty<ArcStr>,
+    filler: &DataRange<ArcStr>,
 ) -> Value {
     let operator = Value::String(String::from(operator));
     let cardinality = json!(cardinality.to_string());
@@ -417,12 +415,12 @@ pub fn translate_data_cardinality(
 
     if filler != Value::Null && !is_rdfs_literal(&filler) {
         res.push(filler);
-    } 
+    }
 
     Value::Array(res)
 }
 
-pub fn translate_atom(atom: &Atom<RcStr>) -> Value {
+pub fn translate_atom(atom: &Atom<ArcStr>) -> Value {
     match atom {
         Atom::BuiltInAtom { pred, args } => {
             let operator = Value::String(String::from("BuiltInAtom"));
@@ -437,16 +435,16 @@ pub fn translate_atom(atom: &Atom<RcStr>) -> Value {
             let mut v = vec![operator, pred];
             v.extend(dargs);
             Value::Array(v)
-        },
-        Atom::ClassAtom{ pred, arg } => {
+        }
+        Atom::ClassAtom { pred, arg } => {
             let operator = Value::String(String::from("ClassAtom"));
             let expression = translate_class_expression(pred);
             let arg = translate_iarg(arg);
 
             let v = vec![operator, expression, arg];
             Value::Array(v)
-        },
-        Atom::DataPropertyAtom{ pred, args } => {
+        }
+        Atom::DataPropertyAtom { pred, args } => {
             let operator = Value::String(String::from("DataPropertyAtom"));
             let property = translate_data_property(pred);
             let arg1 = translate_darg(&args.0);
@@ -454,21 +452,21 @@ pub fn translate_atom(atom: &Atom<RcStr>) -> Value {
 
             let v = vec![operator, property, arg1, arg2];
             Value::Array(v)
-        },
-        Atom::DataRangeAtom{ pred, arg } => {
+        }
+        Atom::DataRangeAtom { pred, arg } => {
             let operator = Value::String(String::from("DataRangeAtom"));
             let range = translate_data_range(pred);
             let arg = translate_darg(arg);
 
             let v = vec![operator, range, arg];
             Value::Array(v)
-        },
-        Atom::DifferentIndividualsAtom( arg1, arg2 ) => {
+        }
+        Atom::DifferentIndividualsAtom(arg1, arg2) => {
             let operator = Value::String(String::from("DifferentIndividualsAtom"));
             let v = vec![operator, translate_iarg(arg1), translate_iarg(arg2)];
             Value::Array(v)
-        },
-        Atom::ObjectPropertyAtom{ pred, args } => {
+        }
+        Atom::ObjectPropertyAtom { pred, args } => {
             let operator = Value::String(String::from("ObjectPropertyAtom"));
             let property = translate_object_property_expression(pred);
             let arg1 = translate_iarg(&args.0);
@@ -476,8 +474,8 @@ pub fn translate_atom(atom: &Atom<RcStr>) -> Value {
 
             let v = vec![operator, property, arg1, arg2];
             Value::Array(v)
-        },
-        Atom::SameIndividualAtom( arg1, arg2 ) => {
+        }
+        Atom::SameIndividualAtom(arg1, arg2) => {
             let operator = Value::String(String::from("SameIndividualAtom"));
             let v = vec![operator, translate_iarg(arg1), translate_iarg(arg2)];
             Value::Array(v)
@@ -485,34 +483,29 @@ pub fn translate_atom(atom: &Atom<RcStr>) -> Value {
     }
 }
 
-pub fn translate_iarg(iarg: &IArgument<RcStr>) -> Value {
+pub fn translate_iarg(iarg: &IArgument<ArcStr>) -> Value {
     match iarg {
         IArgument::Variable(x) => {
             let operator = Value::String(String::from("Variable"));
-            let v = vec![operator, Value::String(String::from(x))]; 
+            let v = vec![operator, Value::String(String::from(x))];
             Value::Array(v)
         }
-        IArgument::Individual(x) => {
-            translate_individual(x)
-        }
+        IArgument::Individual(x) => translate_individual(x),
     }
 }
 
-pub fn translate_darg(darg: &DArgument<RcStr>) -> Value {
+pub fn translate_darg(darg: &DArgument<ArcStr>) -> Value {
     match darg {
         DArgument::Variable(x) => {
             let operator = Value::String(String::from("Variable"));
-            let v = vec![operator, Value::String(String::from(x))]; 
+            let v = vec![operator, Value::String(String::from(x))];
             Value::Array(v)
         }
-        DArgument::Literal(x) => {
-            translate_literal(x)
-        }
+        DArgument::Literal(x) => translate_literal(x),
     }
 }
 
-
-pub fn translate_class_expression(expression: &ClassExpression<RcStr>) -> Value {
+pub fn translate_class_expression(expression: &ClassExpression<ArcStr>) -> Value {
     match expression {
         ClassExpression::Class(x) => translate_class(&x),
         ClassExpression::ObjectIntersectionOf(x) => {
