@@ -2,14 +2,20 @@ use anyhow::{Context, Result};
 use clap::ArgMatches;
 use horned_bin::parse_path;
 use horned_owl::io::ParserConfiguration;
+use horned_owl::io::owx::reader::*;
 use horned_owl::model::*;
 use horned_owl::ontology::set::SetOntology;
+use rayon::prelude::*;
 use regex::Regex;
-use serde_json::Value;
 use serde_json::json;
+use serde_json::Value;
 use sqlx::{sqlite::SqlitePoolOptions, QueryBuilder, Row, SqlitePool};
 use std::collections::HashMap;
 use std::path::Path;
+use std::io::{BufReader, Result as IoResult};
+use std::fs::File;
+
+use std::time::Instant;
 
 use crate::owl_2_ofn;
 
@@ -29,29 +35,30 @@ pub async fn import(sub_matches: &ArgMatches) -> Result<()> {
     let database_path = database.unwrap();
     let ontology_path = ontology.unwrap();
 
-    //parse ontology using horned_owl
-    match parse_path(Path::new(&ontology_path), ParserConfiguration::default()) {
-        Ok(parsed) => {
-            let ont = &parsed.decompose().0;
+    let file = File::open(ontology_path)?;
+    let reader = BufReader::new(file);
+    let build = Build::<ArcStr>::new();
 
+     match read_with_build(reader, &build) {
+        Ok((ontology, prefix_mapping)) => {
+            // Use `ontology` and `prefix_mapping` as needed
             let pool = SqlitePoolOptions::new()
                 .max_connections(5)
                 .connect(database_path)
                 .await
                 .context("Failed to connect to the database")?;
 
-            import_ontology(ont, &pool).await?;
+            import_ontology(&ontology, &pool).await?;
+        },
+        Err(e) => {
+            eprintln!("Failed to read ontology: {:?}", e);
         }
-        Err(error) => anyhow::bail!("Failed to parse ontology: {}", error),
     }
-
     Ok(())
 }
 
-async fn import_ontology(ontology: &SetOntology<RcStr>, pool: &SqlitePool) -> Result<()> {
+async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> Result<()> {
     let id = ontology.i();
-    //let iri = id.clone().the_ontology_id().unwrap().iri.unwrap();
-    //let iri_value = Value::String(String::from(iri.get(0..).unwrap()));
 
     let i = id.clone().the_ontology_id().unwrap().iri.unwrap();
     let ii = i.get(0..);
@@ -82,37 +89,78 @@ async fn import_ontology(ontology: &SetOntology<RcStr>, pool: &SqlitePool) -> Re
     let mut ldtab_triples = Vec::new();
     let count = ontology.iter().count();
     println!("Number of axioms: {}", count);
-    for ann_axiom in ontology.iter() {
 
-        //1. translate Horned OWL to OFN S-expression
-        let ofn = owl_2_ofn::transducer::translate(ann_axiom);
-        let ofn = match ofn[0].as_str() {
 
-            Some("Import") => Value::Array(vec![ofn[0].clone(), iri_value.clone(), ofn[1].clone()]),
-            Some("OntologyAnnotation") => {
-                Value::Array(vec![ofn[0].clone(), iri_value.clone(), ofn[1].clone()])
+    //split ontology
+    let mut imports = Vec::new();
+    let mut ontology_annotations = Vec::new();
+    let mut dl_safe_rules = Vec::new();
+    let mut normal = Vec::new();
+
+    ontology.iter().for_each(|ann_axiom| {
+        let component = &ann_axiom.component;
+        match component {
+            Component::Import(_) => imports.push(ann_axiom),
+            Component::OntologyAnnotation(_) => ontology_annotations.push(ann_axiom),
+            Component::Rule(_) => dl_safe_rules.push(ann_axiom),
+            _ => normal.push(ann_axiom),
+        }});
+
+    let start = Instant::now();
+    ldtab_triples.par_extend(
+        normal.par_iter()
+        .map(|ann_axiom| owl_2_ldtab(ann_axiom, &map))
+        .filter_map(|res| match res {
+            Ok(t) => Some(t),
+            Err(e) => {
+                println!("Error: {:?}", e);
+                None
             }
-            _ => ofn.clone(),
-        };
+        }));
+
+
+    //handle imports (the ontology's iri is not available in Horned-OWL's construct, so we add it here)
+    imports.iter().for_each(|ann_axiom| {
+        let ofn = owl_2_ofn::transducer::translate(ann_axiom);
+        let ofn = Value::Array(vec![ofn[0].clone(), iri_value.clone(), ofn[1].clone()]);
 
         let ofn_curified = curify_with(&ofn, &map);
 
-        //2. translate OFN S-Expression to LDTab ThickTriple
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn_curified);
 
-        //An "Ontology" object in Horned-OWL gets translated into two LDTab triples
-        if ldtab["predicate"] == "owl:versionIRI" {
-            let mut t = ldtab.clone();
-            t["predicate"] = json!("rdf:type");
-            t["object"] = json!("owl:Ontology");
+        ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+    });
 
-            ldtab_triples.push(ldtab_2_tuple(&t).unwrap());
+    //handle ontology annotations (the ontology's iri is not available in Horned-OWL's construct, so we add it here)
+    ontology_annotations.iter().for_each(|ann_axiom| {
+        let ofn = owl_2_ofn::transducer::translate(ann_axiom);
+        let ofn = Value::Array(vec![ofn[0].clone(), iri_value.clone(), ofn[1].clone()]);
+
+        let ofn_curified = curify_with(&ofn, &map);
+
+        let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn_curified);
+
+        ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+    });
+
+
+    //handle SWRL rules (a single rule is split into multiple LDTab triples)
+    dl_safe_rules.iter().for_each(|ann_axiom| {
+        let ofn = owl_2_ofn::transducer::translate(ann_axiom);
+
+        let ofn_curified = curify_with(&ofn, &map);
+
+        let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn_curified);
+
+        for triple in ldtab.as_array().unwrap() {
+            ldtab_triples.push(ldtab_2_tuple(&triple).unwrap());
         }
+    });
 
-        let ldtab_tuple = ldtab_2_tuple(&ldtab).unwrap();
+    let duration = start.elapsed();
+    println!("OWL2LDTab took: {:?}", duration);
 
-        ldtab_triples.push(ldtab_tuple);
-    }
+    let time = Instant::now();
 
     // Insert LDTab triples into the database
     // (in chunks - the QueryBuilder can only handle a limited number of parameters at once)
@@ -148,7 +196,31 @@ async fn import_ontology(ontology: &SetOntology<RcStr>, pool: &SqlitePool) -> Re
 
         start = end;
     }
+
+    let duration = time.elapsed();
+    println!("Sqlite took: {:?}", duration);
+
     Ok(())
+}
+
+fn owl_2_ldtab(ann_axiom: &AnnotatedComponent<ArcStr>, map : &HashMap<String, String>) -> std::io::Result<(i32, i32, String, String, String, String, String, String)> {
+
+        let ofn = owl_2_ofn::transducer::translate(ann_axiom);
+
+        let ofn_curified = curify_with(&ofn, &map);
+
+        let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn_curified);
+
+        //An "Ontology" object in Horned-OWL gets translated into two LDTab triples
+        if ldtab["predicate"] == "owl:versionIRI" {
+            let mut t = ldtab.clone();
+            t["predicate"] = json!("rdf:type");
+            t["object"] = json!("owl:Ontology");
+
+            return ldtab_2_tuple(&t)
+        }
+
+        ldtab_2_tuple(&ldtab)
 }
 
 //TODO: wiring doesn't pull apart literals and language tags/datatypes
@@ -164,7 +236,10 @@ fn ldtab_2_tuple(
     let retraction = string_to_i32(value.get("retraction").unwrap()).unwrap();
 
     let graph = value.get("graph").unwrap().as_str().unwrap();
-    let subject = value.get("subject").unwrap().as_str().unwrap();
+
+    //let subject = value.get("subject").unwrap().as_str().unwrap();
+    let subject = json_value_to_string(value.get("subject").unwrap());
+
     let predicate = value.get("predicate").unwrap().as_str().unwrap();
     let object = json_value_to_string(value.get("object").unwrap()); //Object is already a String
     let datatype = value.get("datatype").unwrap().as_str().unwrap();
