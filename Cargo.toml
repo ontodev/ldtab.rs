@@ -15,6 +15,7 @@ horned-owl = "1.0.0"
 horned-bin = "1.0.0"
 im = "15.1.0"
 itertools = "0.10.3"
+rayon = "1.7"
 rio_api = "0.7.1"
 rio_xml = "0.7.3"
 clap = { version = "4.5.11", features = ["cargo", "derive"] }
