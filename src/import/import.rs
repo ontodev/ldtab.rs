@@ -8,12 +8,14 @@ use horned_owl::ontology::set::SetOntology;
 use rayon::prelude::*;
 use regex::Regex;
 use serde_json::json;
-use serde_json::Value;
+use serde_json::{Value, from_str};
 use sqlx::{sqlite::SqlitePoolOptions, QueryBuilder, Row, SqlitePool};
 use std::collections::HashMap;
 use std::path::Path;
 use std::io::{BufReader, Result as IoResult};
 use std::fs::File;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 use std::time::Instant;
 
@@ -156,6 +158,68 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
             ldtab_triples.push(ldtab_2_tuple(&triple).unwrap());
         }
     });
+
+
+    let mut new_ldtab_triples = Vec::new();
+    let mut hasher = DefaultHasher::new();
+    ldtab_triples.iter().for_each(|t| {
+
+        //get subject
+        let subject: serde_json::Result<Value> = from_str(&t.3);
+
+        match subject {
+            Ok(v) => {
+                if v.is_object() {
+                    if let Value::Object(map) = v {
+                        println!("GCI: {:?}", t);
+                        t.hash(&mut hasher);
+                        let blank_node = format!("_:{}", hasher.finish());
+
+                        for (key, value) in map.iter() {
+                            //TODO: create blank nodes + new triples 
+                            let ldtab = json!({
+                                "assertion":"1",
+                                "retraction": "0",
+                                "graph": "graph",
+                                "subject": blank_node,
+                                "predicate": key,
+                                "object": value,
+                                "datatype": t.6,
+                                "annotation": Value::Null
+                            });
+                            new_ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+                        }
+
+                        let predicate = t.4.clone();
+                        //let object: serde_json::Result<Value> = from_str(&t.5);
+
+                        let ldtab = json!({
+                            "assertion": "1",
+                            "retraction": "0",
+                            "graph": "graph",
+                            "subject": blank_node,
+                            "predicate": predicate,
+                            "object": t.5,
+                            "datatype": t.6,
+                            "annotation": t.7
+                        });
+                        new_ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+                    } else {
+                        new_ldtab_triples.push(t.clone());
+                    }
+
+                } else {
+                    new_ldtab_triples.push(t.clone());
+                }            
+            },
+            Err(e) => {},
+        }
+
+    });
+
+
+    let ldtab_triples = new_ldtab_triples;
+
 
     let duration = start.elapsed();
     println!("OWL2LDTab took: {:?}", duration);
