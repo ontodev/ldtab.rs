@@ -4,6 +4,22 @@ use sqlx::{sqlite::SqlitePoolOptions, Row};
 use std::fs::OpenOptions;
 use std::io::Write;
 
+fn escape_whitespace(input: &str) -> String {
+    input
+        .chars()
+        .map(|c| match c {
+            '\n' => "\\n".to_string(),
+            '\t' => "\\t".to_string(),
+            //'\r' => "\\r".to_string(),
+            //'\x08' => "\\b".to_string(),
+            //'\x0C' => "\\f".to_string(),
+            //'\x0B' => "\\v".to_string(),
+            //' '  => "\\s".to_string(), // Optional: Escape space as '\\s'
+            _ => c.to_string(),
+        })
+        .collect()
+}
+
 pub async fn export(sub_matches: &ArgMatches) -> Result<()> {
     let database = sub_matches.get_one::<String>("database");
     let output = sub_matches.get_one::<String>("output");
@@ -43,7 +59,7 @@ pub async fn export(sub_matches: &ArgMatches) -> Result<()> {
         let graph: String = row.get("graph");
         let subject: String = row.get("subject");
         let predicate: String = row.get("predicate");
-        let object: String = row.get("object");
+        let object: String = escape_whitespace(row.get("object"));
         let datatype: String = row.get("datatype");
         let annotation: String = row.get("annotation");
 
