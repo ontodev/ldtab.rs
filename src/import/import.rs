@@ -171,12 +171,11 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
             Ok(v) => {
                 if v.is_object() {
                     if let Value::Object(map) = v {
-                        println!("GCI: {:?}", t);
+
                         t.hash(&mut hasher);
                         let blank_node = format!("_:{}", hasher.finish());
 
                         for (key, value) in map.iter() {
-                            //TODO: create blank nodes + new triples 
                             let ldtab = json!({
                                 "assertion":"1",
                                 "retraction": "0",
@@ -190,18 +189,15 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
                             new_ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
                         }
 
-                        let predicate = t.4.clone();
-                        //let object: serde_json::Result<Value> = from_str(&t.5);
-
                         let ldtab = json!({
                             "assertion": "1",
                             "retraction": "0",
                             "graph": "graph",
                             "subject": blank_node,
-                            "predicate": predicate,
-                            "object": t.5,
+                            "predicate": t.4,
+                            "object": parse_json_from_string(&t.5),
                             "datatype": t.6,
-                            "annotation": t.7
+                            "annotation": parse_json_from_string(&t.7)
                         });
                         new_ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
                     } else {
@@ -212,14 +208,16 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
                     new_ldtab_triples.push(t.clone());
                 }            
             },
-            Err(e) => {},
+            Err(e) => {
+                    new_ldtab_triples.push(t.clone());
+
+            },
         }
 
     });
 
 
     let ldtab_triples = new_ldtab_triples;
-
 
     let duration = start.elapsed();
     println!("OWL2LDTab took: {:?}", duration);
@@ -265,6 +263,15 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
     println!("Sqlite took: {:?}", duration);
 
     Ok(())
+}
+
+fn parse_json_from_string(s: &str) -> Value {
+    match serde_json::from_str(s) {
+        Ok(v) => v,
+        Err(_) => {
+            Value::String(s.to_string())
+        }
+    }
 }
 
 fn owl_2_ldtab(ann_axiom: &AnnotatedComponent<ArcStr>, map : &HashMap<String, String>) -> std::io::Result<(i32, i32, String, String, String, String, String, String)> {
