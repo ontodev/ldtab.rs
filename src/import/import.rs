@@ -16,6 +16,7 @@ use std::io::{BufReader, Result as IoResult};
 use std::fs::File;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use sha2::{Sha256, Digest};
 
 use std::time::Instant;
 
@@ -161,7 +162,8 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
 
     let mut new_ldtab_triples = Vec::new();
-    let mut hasher = DefaultHasher::new();
+    //let mut hasher = DefaultHasher::new();
+
     ldtab_triples.iter().for_each(|t| {
 
         //get subject
@@ -172,18 +174,59 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
                 if v.is_object() {
                     if let Value::Object(map) = v {
 
-                        t.hash(&mut hasher);
-                        let blank_node = format!("_:{}", hasher.finish());
+                        let blank = json!({
+                            "subject": parse_json_from_string(&t.3),
+                            "predicate": parse_json_from_string(&t.4),
+                            "object": parse_json_from_string(&t.5),
+                            "datatype": parse_json_from_string(&t.6),
+                            "annotation": parse_json_from_string(&t.7)
+                        });
+
+                        let blank_sorted = wiring_rs::ofn_2_ldtab::util::sort_value(&blank);
+                        let blank_string = blank_sorted.to_string();
+
+                        let mut hasher = Sha256::new();
+                        //blank_string.hash(&mut hasher);
+                        hasher.update(blank_string.as_bytes());
+
+                        //let blank_node = format!("_:{}", hasher.finish());
+                        let blank_node_a =  hasher.finalize();
+                        let blank_node = format!("_:{:x}", blank_node_a);
+
+                        let mut datatype = t.6.clone();
 
                         for (key, value) in map.iter() {
+
+                           let value_v =  match value {
+                                Value::String(s) => value.clone() ,
+                                Value::Array(a) => { let x = a[0].as_object().unwrap();
+                                    if x.contains_key("datatype")
+                                        && x.get("datatype").unwrap().as_str().unwrap() == "_IRI" {
+                                            datatype = "_IRI".to_string();
+                                            x.get("object").unwrap().clone()
+                                        }
+                                    else {
+                                        value.clone()
+                                    }
+                                },
+                                Value::Object(x) => { if x.contains_key("datatype")
+                                    && x.get("datatype").unwrap().as_str().unwrap() == "_IRI" {
+                                        datatype = "_IRI".to_string();
+                                        x.get("object").unwrap().clone()
+                                        } else {
+                                            value.clone()
+                                        }},
+                                _ => value.clone()
+                           };
+
                             let ldtab = json!({
                                 "assertion":"1",
                                 "retraction": "0",
                                 "graph": "graph",
                                 "subject": blank_node,
                                 "predicate": key,
-                                "object": value,
-                                "datatype": t.6,
+                                "object": value_v,
+                                "datatype": datatype,
                                 "annotation": Value::Null
                             });
                             new_ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
