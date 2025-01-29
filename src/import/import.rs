@@ -25,6 +25,7 @@ use crate::owl_2_ofn;
 const SQLITE_MAX_VARIABLE_NUMBER: usize = 999;
 const NUM_COLUMNS: usize = 8;
 
+
 pub async fn import(sub_matches: &ArgMatches) -> Result<()> {
     let database = sub_matches.get_one::<String>("database");
     let ontology = sub_matches.get_one::<String>("ontology");
@@ -155,14 +156,13 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn_curified);
 
+        //TODO: SHA256 hash
         for triple in ldtab.as_array().unwrap() {
             ldtab_triples.push(ldtab_2_tuple(&triple).unwrap());
         }
     });
 
-
     let mut new_ldtab_triples = Vec::new();
-    //let mut hasher = DefaultHasher::new();
 
     ldtab_triples.iter().for_each(|t| {
 
@@ -178,18 +178,16 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
                             "subject": parse_json_from_string(&t.3),
                             "predicate": parse_json_from_string(&t.4),
                             "object": parse_json_from_string(&t.5),
-                            "datatype": parse_json_from_string(&t.6),
-                            "annotation": parse_json_from_string(&t.7)
+                            "datatype": parse_json_from_string(&t.6)
+                            //"annotation": parse_json_from_string(&t.7)
                         });
 
                         let blank_sorted = wiring_rs::ofn_2_ldtab::util::sort_value(&blank);
                         let blank_string = blank_sorted.to_string();
 
                         let mut hasher = Sha256::new();
-                        //blank_string.hash(&mut hasher);
                         hasher.update(blank_string.as_bytes());
 
-                        //let blank_node = format!("_:{}", hasher.finish());
                         let blank_node_a =  hasher.finalize();
                         let blank_node = format!("_:{:x}", blank_node_a);
 
