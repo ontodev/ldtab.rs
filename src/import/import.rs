@@ -189,7 +189,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
                         hasher.update(blank_string.as_bytes());
 
                         let blank_node_a =  hasher.finalize();
-                        let blank_node = format!("_:{:x}", blank_node_a);
+                        let blank_node = format!("<ldtab:blanknode:{:x}>", blank_node_a);
 
                         let mut datatype = t.6.clone();
 
