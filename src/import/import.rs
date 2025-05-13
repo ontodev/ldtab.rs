@@ -79,10 +79,8 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
     .await
     .context("Failed to fetch rows from the table")?;
 
-    // Initialize an empty HashMap
+    //initialize map for prefixes
     let mut map = HashMap::new();
-
-    // Iterate over the rows and insert them into the HashMap
     for row in rows {
         let base: String = row.get("base");
         let prefix: String = row.get("prefix");
@@ -128,11 +126,11 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
         let ofn = owl_2_ofn::transducer::translate(ann_axiom);
         let ofn = Value::Array(vec![ofn[0].clone(), iri_value.clone(), ofn[1].clone()]);
 
-        let ofn_curified = curify_with(&ofn, &map);
+        let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
-        let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn_curified);
+        let ldtab_curified = curify_ldtab_with(&ldtab, &map);
 
-        ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+        ldtab_triples.push(ldtab_2_tuple(&ldtab_curified).unwrap());
     });
 
     //handle ontology annotations (the ontology's iri is not available in Horned-OWL's construct, so we add it here)
@@ -140,11 +138,11 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
         let ofn = owl_2_ofn::transducer::translate(ann_axiom);
         let ofn = Value::Array(vec![ofn[0].clone(), iri_value.clone(), ofn[1].clone()]);
 
-        let ofn_curified = curify_with(&ofn, &map);
+        let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
-        let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn_curified);
+        let ldtab_curified = curify_ldtab_with(&ldtab, &map);
 
-        ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+        ldtab_triples.push(ldtab_2_tuple(&ldtab_curified).unwrap());
     });
 
 
@@ -152,12 +150,12 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
     dl_safe_rules.iter().for_each(|ann_axiom| {
         let ofn = owl_2_ofn::transducer::translate(ann_axiom);
 
-        let ofn_curified = curify_with(&ofn, &map);
+        let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
-        let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn_curified);
+        let ldtab_curified = curify_ldtab_with(&ldtab, &map);
 
         //TODO: SHA256 hash
-        for triple in ldtab.as_array().unwrap() {
+        for triple in ldtab_curified.as_array().unwrap() {
             ldtab_triples.push(ldtab_2_tuple(&triple).unwrap());
         }
     });
@@ -319,12 +317,12 @@ fn owl_2_ldtab(ann_axiom: &AnnotatedComponent<ArcStr>, map : &HashMap<String, St
 
         let ofn = owl_2_ofn::transducer::translate(ann_axiom);
 
-        let ofn_curified = curify_with(&ofn, &map);
+        let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
-        let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn_curified);
+        let ldtab_curified = curify_ldtab_with(&ldtab, map);
 
         //An "Ontology" object in Horned-OWL gets translated into two LDTab triples
-        if ldtab["predicate"] == "owl:versionIRI" {
+        if ldtab_curified["predicate"] == "owl:versionIRI" {
             let mut t = ldtab.clone();
             t["predicate"] = json!("rdf:type");
             t["object"] = json!("owl:Ontology");
@@ -332,7 +330,7 @@ fn owl_2_ldtab(ann_axiom: &AnnotatedComponent<ArcStr>, map : &HashMap<String, St
             return ldtab_2_tuple(&t)
         }
 
-        ldtab_2_tuple(&ldtab)
+        ldtab_2_tuple(&ldtab_curified)
 }
 
 //TODO: wiring doesn't pull apart literals and language tags/datatypes
@@ -369,21 +367,29 @@ fn ldtab_2_tuple(
     ))
 }
 
-fn curify_with(ofn: &Value, iri2prefix: &HashMap<String, String>) -> Value {
-    match ofn {
+fn curify_ldtab_with(ldtab :&Value, iri2prefix: &HashMap<String, String>) -> Value {
+    match ldtab {
         Value::Array(vec) => {
-            // Create a new array with the replaced values
             let new_vec: Vec<Value> = vec
                 .iter()
-                .map(|item| curify_with(item, iri2prefix))
+                .map(|item| curify_ldtab_with(item, iri2prefix))
                 .collect();
             Value::Array(new_vec)
         }
-        Value::String(s) => {
-            // Replace all matching substrings in the string
-            Value::String(replace_substrings(s, iri2prefix))
+        Value::Object(map) => {
+            let mut new_map = map.clone();
+            for (key, value) in map.iter() {
+                new_map.insert(key.clone(), curify_ldtab_with(value, iri2prefix));
+            }
+            Value::Object(new_map)
         }
-        _ => ofn.clone(), // This case shouldn't occur, but we clone in case
+        Value::String(s) => {
+
+            Value::String(replace_substrings(s, iri2prefix))
+
+
+        }
+        _ => ldtab.clone(), // This case shouldn't occur, but we clone in case
     }
 }
 
