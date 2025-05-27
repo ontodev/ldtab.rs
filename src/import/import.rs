@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::ArgMatches;
+use std::collections::HashSet;
 use horned_bin::parse_path;
 use horned_owl::io::ParserConfiguration;
 use horned_owl::io::owx::reader::*;
@@ -147,7 +148,38 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
 
     //handle SWRL rules (a single rule is split into multiple LDTab triples)
+    let variables: HashSet<Variable<ArcStr>> = dl_safe_rules
+        .iter()
+        .flat_map(|ann_axiom| {
+            let rule = match &ann_axiom.component {
+                Component::Rule(r) => r,
+                other => panic!(
+                    "Expected a Rule‐component, but found: {:?}", 
+                    other
+                ),
+            };
+            get_rule_variables(rule)
+        })
+        .collect();
+    for var in &variables {
+        let var_iri = format!("<{}>", var.0);
+        let ldtab = json!({
+            "assertion":"1",
+            "retraction": "0",
+            "graph": "graph",
+            "subject": var_iri,
+            "predicate": "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>",
+            "object": "<http://www.w3.org/2003/11/swrl#Variable>",
+            "datatype": "_IRI",
+            "annotation": Value::Null
+        });
+        let ldtab_curified = curify_ldtab_with(&ldtab, &map);
+        ldtab_triples.push(ldtab_2_tuple(&ldtab_curified).unwrap());
+
+    }
+
     dl_safe_rules.iter().for_each(|ann_axiom| {
+
         let ofn = owl_2_ofn::transducer::translate(ann_axiom);
 
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
@@ -312,6 +344,77 @@ fn parse_json_from_string(s: &str) -> Value {
         }
     }
 }
+
+pub fn get_rule_variables<A>(rule: &Rule<A>) -> HashSet<Variable<A>>
+where
+    A: ForIRI,
+{
+    let mut vars = HashSet::new();
+
+    // Iterate over every atom in head ∪ body
+    for atom in rule.head.iter().chain(rule.body.iter()) {
+        match *atom {
+            // Built-in atoms have a Vec<DArgument<A>>
+            Atom::BuiltInAtom { ref args, .. } => {
+                for arg in args {
+                    if let DArgument::Variable(ref var) = arg {
+                        vars.insert(var.clone());
+                    }
+                }
+            }
+
+            // Class atoms have a single IArgument<A>
+            Atom::ClassAtom { ref arg, .. } => {
+                if let IArgument::Variable(ref var) = arg {
+                    vars.insert(var.clone());
+                }
+            }
+
+            // DataPropertyAtom has two DArgument<A> fields
+            Atom::DataPropertyAtom { ref args, .. } => {
+                let (d1, d2) = args;
+                if let DArgument::Variable(ref var) = d1 {
+                    vars.insert(var.clone());
+                }
+                if let DArgument::Variable(ref var) = d2 {
+                    vars.insert(var.clone());
+                }
+            }
+
+            // DataRangeAtom has one DArgument<A>
+            Atom::DataRangeAtom { ref arg, .. } => {
+                if let DArgument::Variable(ref var) = arg {
+                    vars.insert(var.clone());
+                }
+            }
+
+            // DifferentIndividuals and SameIndividual carry two IArgument<A>
+            Atom::DifferentIndividualsAtom(ref i1, ref i2)
+            | Atom::SameIndividualAtom(ref i1, ref i2) => {
+                if let IArgument::Variable(ref var) = i1 {
+                    vars.insert(var.clone());
+                }
+                if let IArgument::Variable(ref var) = i2 {
+                    vars.insert(var.clone());
+                }
+            }
+
+            // ObjectPropertyAtom has two IArgument<A>
+            Atom::ObjectPropertyAtom { ref args, .. } => {
+                let (i1, i2) = args;
+                if let IArgument::Variable(ref var) = i1 {
+                    vars.insert(var.clone());
+                }
+                if let IArgument::Variable(ref var) = i2 {
+                    vars.insert(var.clone());
+                }
+            }
+        }
+    }
+
+    vars
+}
+
 
 fn owl_2_ldtab(ann_axiom: &AnnotatedComponent<ArcStr>, map : &HashMap<String, String>) -> std::io::Result<(i32, i32, String, String, String, String, String, String)> {
 
