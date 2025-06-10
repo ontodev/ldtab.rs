@@ -480,9 +480,10 @@ fn curify_ldtab_with(ldtab :&Value, iri2prefix: &HashMap<String, String>) -> Val
             Value::Array(new_vec)
         }
         Value::Object(map) => {
-            let mut new_map = map.clone();
+            let mut new_map = serde_json::Map::new();
             for (key, value) in map.iter() {
-                new_map.insert(key.clone(), curify_ldtab_with(value, iri2prefix));
+                let curified_key = replace_substrings(key, iri2prefix);
+                new_map.insert(curified_key, curify_ldtab_with(value, iri2prefix));
             }
             Value::Object(new_map)
         }
