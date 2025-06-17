@@ -98,6 +98,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
     let mut imports = Vec::new();
     let mut ontology_annotations = Vec::new();
     let mut dl_safe_rules = Vec::new();
+    let mut ontology_id = Vec::new();
     let mut normal = Vec::new();
 
     ontology.iter().for_each(|ann_axiom| {
@@ -106,6 +107,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
             Component::Import(_) => imports.push(ann_axiom),
             Component::OntologyAnnotation(_) => ontology_annotations.push(ann_axiom),
             Component::Rule(_) => dl_safe_rules.push(ann_axiom),
+            Component::OntologyID(_) => ontology_id.push(ann_axiom),
             _ => normal.push(ann_axiom),
         }});
 
@@ -121,6 +123,23 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
             }
         }));
 
+    ontology_id.iter().for_each(|ann_axiom| {
+        let ofn = owl_2_ofn::transducer::translate(ann_axiom);
+        let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
+
+        let ldtab_curified = curify_ldtab_with(&ldtab, &map);
+
+        //An "Ontology" object in Horned-OWL gets translated into two LDTab triples
+        if ldtab_curified["predicate"] == "owl:versionIRI" {
+            let mut t = ldtab_curified.clone();
+            t["predicate"] = json!("rdf:type");
+            t["object"] = json!("owl:Ontology");
+
+            ldtab_triples.push(ldtab_2_tuple(&t).unwrap())
+        }
+
+        ldtab_triples.push(ldtab_2_tuple(&ldtab_curified).unwrap());
+    });
 
     //handle imports (the ontology's iri is not available in Horned-OWL's construct, so we add it here)
     imports.iter().for_each(|ann_axiom| {
@@ -423,15 +442,6 @@ fn owl_2_ldtab(ann_axiom: &AnnotatedComponent<ArcStr>, map : &HashMap<String, St
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
         let ldtab_curified = curify_ldtab_with(&ldtab, map);
-
-        //An "Ontology" object in Horned-OWL gets translated into two LDTab triples
-        if ldtab_curified["predicate"] == "owl:versionIRI" {
-            let mut t = ldtab.clone();
-            t["predicate"] = json!("rdf:type");
-            t["object"] = json!("owl:Ontology");
-
-            return ldtab_2_tuple(&t)
-        }
 
         ldtab_2_tuple(&ldtab_curified)
 }
