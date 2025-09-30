@@ -96,6 +96,7 @@ pub fn translate_literal(literal: &Literal<ArcStr>) -> Value {
     match literal {
         //we need to use double quotes here to mark a string as a literal
         Literal::Simple { literal } => json!(format!("\"{}\"", literal)),
+        //Literal::Simple { literal } => json!(format!("{}", literal)),
         //{ if literal.is_empty() {
         //    json!("") } else {
         //    json!(format!("\"{}\"",literal))}},
@@ -376,7 +377,7 @@ pub fn translate_data_all_values_from(
 }
 
 pub fn translate_data_has_value(property: &DataProperty<ArcStr>, literal: &Literal<ArcStr>) -> Value {
-    let operator = Value::String(String::from("ObjectAllValuesFrom"));
+    let operator = Value::String(String::from("DataHasValue"));
     let value = translate_literal(literal);
     let property = translate_data_property(property);
 
