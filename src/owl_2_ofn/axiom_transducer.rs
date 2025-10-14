@@ -378,14 +378,22 @@ pub fn translate_has_key(axiom: &HasKey<ArcStr>) -> Value {
     let ce = expression_transducer::translate_class_expression(&axiom.ce);
     let properties = axiom.vpe.clone();
 
-    let mut operands: Vec<Value> = properties
+    //NB: horned owl doesn't distinguish between object and data properties in hasKey
+    let operands: Vec<Value> = properties
         .into_iter()
         .map(|x| expression_transducer::translate_property_expression(&x))
         .collect();
 
-    operands.insert(0, ce);
-    operands.insert(0, operator);
-    Value::Array(operands)
+    // empty vector for third HasKey argument (datatype properties) 
+    let dummy = Vec::new();
+
+    let mut res = Vec::new();
+    res.push(operator);
+    res.push(ce);
+    res.push(Value::Array(operands));
+    res.push(Value::Array(dummy)); // no annotation support yet
+
+    Value::Array(res)
 }
 
 pub fn translate_same_individual(axiom: &SameIndividual<ArcStr>) -> Value {
@@ -464,6 +472,7 @@ pub fn translate_negative_data_property_assertion(
 }
 
 pub fn translate_annotation_assertion(axiom: &AnnotationAssertion<ArcStr>) -> Value {
+
     let operator = Value::String(String::from("AnnotationAssertion"));
     let subject = annotation_transducer::translate_annotation_subject(&axiom.subject);
     let property = annotation_transducer::translate_annotation_property(&axiom.ann.ap);
@@ -553,10 +562,13 @@ pub fn translate_ontology_id(axiom: &OntologyID<ArcStr>) -> Value {
     let iri = "<".to_string() + ii.unwrap() + ">";
     let iri = json!(iri);
 
-    let version = axiom.viri.clone().unwrap();
-    let vi = version.get(0..);
-    let viri = "<".to_string() + vi.unwrap() + ">";
-    let viri = json!(viri);
+    let viri = json!(format!("<{}>", axiom.viri.as_deref().unwrap_or("unknown")));
+
+
+    //let version = axiom.viri.clone().unwrap();
+    //let vi = version.get(0..);
+    //let viri = "<".to_string() + vi.unwrap() + ">";
+    //let viri = json!(viri);
 
     let v = vec![operator, iri, viri];
     Value::Array(v)
