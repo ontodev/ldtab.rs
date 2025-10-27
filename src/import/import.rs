@@ -9,7 +9,7 @@ use horned_owl::ontology::set::SetOntology;
 use rayon::prelude::*;
 use regex::Regex;
 use serde_json::json;
-use serde_json::{Value, from_str};
+use serde_json::{Value, Map, from_str};
 use sqlx::{sqlite::SqlitePoolOptions, QueryBuilder, Row, SqlitePool};
 use std::collections::HashMap;
 use std::path::Path;
@@ -125,20 +125,19 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
     ontology_id.iter().for_each(|ann_axiom| {
         let ofn = owl_2_ofn::transducer::translate(ann_axiom);
+        println!("ofn: {:?}", ofn);
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
-        let ldtab_curified = curify_ldtab_with(&ldtab, &map);
-
         //An "Ontology" object in Horned-OWL gets translated into two LDTab triples
-        if ldtab_curified["predicate"] == "owl:versionIRI" {
-            let mut t = ldtab_curified.clone();
-            t["predicate"] = json!("rdf:type");
-            t["object"] = json!("owl:Ontology");
+        if ldtab["predicate"] == "<http://www.w3.org/2002/07/owl#versionIRI>" {
+            let mut t = ldtab.clone();
+            t["predicate"] = json!("<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>");
+            t["object"] = json!("<http://www.w3.org/2002/07/owl#Ontology>");
 
             ldtab_triples.push(ldtab_2_tuple(&t).unwrap())
         }
 
-        ldtab_triples.push(ldtab_2_tuple(&ldtab_curified).unwrap());
+        ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
     });
 
     //handle imports (the ontology's iri is not available in Horned-OWL's construct, so we add it here)
@@ -148,9 +147,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
-        let ldtab_curified = curify_ldtab_with(&ldtab, &map);
-
-        ldtab_triples.push(ldtab_2_tuple(&ldtab_curified).unwrap());
+        ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
     });
 
     //handle ontology annotations (the ontology's iri is not available in Horned-OWL's construct, so we add it here)
@@ -160,9 +157,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
-        let ldtab_curified = curify_ldtab_with(&ldtab, &map);
-
-        ldtab_triples.push(ldtab_2_tuple(&ldtab_curified).unwrap());
+        ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
     });
 
 
@@ -192,8 +187,8 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
             "datatype": "_IRI",
             "annotation": Value::Null
         });
-        let ldtab_curified = curify_ldtab_with(&ldtab, &map);
-        ldtab_triples.push(ldtab_2_tuple(&ldtab_curified).unwrap());
+
+        ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
 
     }
 
@@ -203,10 +198,8 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
-        let ldtab_curified = curify_ldtab_with(&ldtab, &map);
-
         //TODO: SHA256 hash
-        for triple in ldtab_curified.as_array().unwrap() {
+        for triple in ldtab.as_array().unwrap() {
             ldtab_triples.push(ldtab_2_tuple(&triple).unwrap());
         }
     });
@@ -220,7 +213,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
         match subject {
             Ok(v) => {
-                if v.is_object() {
+                if v.is_object() { //blank node as subject
                     if let Value::Object(map) = v {
 
                         let blank = json!({
@@ -239,6 +232,9 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
                         let blank_node_a =  hasher.finalize();
                         let blank_node = format!("<ldtab:blanknode:{:x}>", blank_node_a);
+
+                        //println!("Blank node id: {}", blank_node);
+                        //println!("Blank node string: {}", blank_string);
 
                         let mut datatype = t.6.clone();
 
@@ -306,8 +302,27 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
     });
 
+    //run curify_ldtab_with on all ldtab_triples
+    let mut ldtab_triples = Vec::new();
 
-    let ldtab_triples = new_ldtab_triples;
+    new_ldtab_triples.iter().for_each(|t| {
+        let ldtab = json!({
+            "assertion": "1",
+            "retraction": "0",
+            "graph": t.2,
+            "subject": t.3,
+            "predicate": t.4,
+            "object": t.5,
+            "datatype": t.6,
+            "annotation": t.7
+        });
+
+        let ldtab_curified = curify_ldtab_with(&ldtab, &map);
+
+        let tuple = ldtab_2_tuple(&ldtab_curified).unwrap();
+        ldtab_triples.push(tuple);
+
+    });
 
     let duration = start.elapsed();
     println!("OWL2LDTab took: {:?}", duration);
@@ -439,7 +454,11 @@ fn owl_2_ldtab(ann_axiom: &AnnotatedComponent<ArcStr>, map : &HashMap<String, St
 
         let ofn = owl_2_ofn::transducer::translate(ann_axiom);
 
+        //println!("ofn: {:?}", ofn);
+
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
+
+        //println!("ldtab: {:?}", ldtab);
 
         let ldtab_curified = curify_ldtab_with(&ldtab, map);
 
@@ -597,4 +616,11 @@ fn get_annotation(value: &Value) -> String {
         }
         _ => String::new(),
     }
+}
+
+pub fn is_ldtab_blanknode(input: &Value) -> bool {
+    input
+        .as_str()
+        .map(|s| s.starts_with("<ldtab:blanknode"))
+        .unwrap_or(false)
 }
