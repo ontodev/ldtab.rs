@@ -123,6 +123,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
             }
         }));
 
+    //translate ontology ID
     ontology_id.iter().for_each(|ann_axiom| {
         let ofn = owl_2_ofn::transducer::translate(ann_axiom);
         println!("ofn: {:?}", ofn);
@@ -204,6 +205,8 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
         }
     });
 
+
+
     let mut new_ldtab_triples = Vec::new();
 
     ldtab_triples.iter().for_each(|t| {
@@ -211,19 +214,15 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
         //get subject
         let subject: serde_json::Result<Value> = from_str(&t.3);
 
+        //TODO: split existential blank nodes
+
+        //handle blank node as subject
         match subject {
             Ok(v) => {
                 if v.is_object() { //blank node as subject
                     if let Value::Object(map) = v {
 
-                        let blank = json!({
-                            "subject": parse_json_from_string(&t.3),
-                            "predicate": parse_json_from_string(&t.4),
-                            "object": parse_json_from_string(&t.5),
-                            "datatype": parse_json_from_string(&t.6)
-                            //"annotation": parse_json_from_string(&t.7)
-                        });
-
+                        let blank = Value::Object(map.clone());
                         let blank_sorted = wiring_rs::ofn_2_ldtab::util::sort_value(&blank);
                         let blank_string = blank_sorted.to_string();
 
@@ -246,6 +245,11 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
                                     if x.contains_key("datatype")
                                         && x.get("datatype").unwrap().as_str().unwrap() == "_IRI" {
                                             datatype = "_IRI".to_string();
+                                            x.get("object").unwrap().clone()
+                                        }
+                                    else if x.contains_key("datatype")
+                                        && x.get("datatype").unwrap().as_str().unwrap() == "_JSONLIST" {
+                                            datatype = "_JSONLIST".to_string();
                                             x.get("object").unwrap().clone()
                                         }
                                     else {
@@ -299,6 +303,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
             },
         }
+
 
     });
 
@@ -454,11 +459,7 @@ fn owl_2_ldtab(ann_axiom: &AnnotatedComponent<ArcStr>, map : &HashMap<String, St
 
         let ofn = owl_2_ofn::transducer::translate(ann_axiom);
 
-        //println!("ofn: {:?}", ofn);
-
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
-
-        //println!("ldtab: {:?}", ldtab);
 
         let ldtab_curified = curify_ldtab_with(&ldtab, map);
 
