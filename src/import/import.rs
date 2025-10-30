@@ -126,7 +126,6 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
     //translate ontology ID
     ontology_id.iter().for_each(|ann_axiom| {
         let ofn = owl_2_ofn::transducer::translate(ann_axiom);
-        println!("ofn: {:?}", ofn);
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
         //An "Ontology" object in Horned-OWL gets translated into two LDTab triples
@@ -138,7 +137,9 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
             ldtab_triples.push(ldtab_2_tuple(&t).unwrap())
         }
 
-        ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+        if !(ldtab["object"] == "<unknown>"){
+            ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+        }
     });
 
     //handle imports (the ontology's iri is not available in Horned-OWL's construct, so we add it here)
@@ -211,99 +212,122 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
     ldtab_triples.iter().for_each(|t| {
 
-        //get subject
-        let subject: serde_json::Result<Value> = from_str(&t.3);
+        //handle ldtab blank nodes 
+        let s = parse_json_from_string(&t.3);
+        let o = parse_json_from_string(&t.5);
 
-        //TODO: split existential blank nodes
+        if is_ldtab_blanknode(&s) {
+            //&& datatype_obj.unwrap().as_str().unwrap() == "_JSONMAP" { //subject is already a blank node
 
-        //handle blank node as subject
-        match subject {
-            Ok(v) => {
-                if v.is_object() { //blank node as subject
-                    if let Value::Object(map) = v {
+            if let Value::Object(map) = o {
 
-                        let blank = Value::Object(map.clone());
-                        let blank_sorted = wiring_rs::ofn_2_ldtab::util::sort_value(&blank);
-                        let blank_string = blank_sorted.to_string();
+                let mut datatype = t.6.clone();
+                for (key, value) in map.iter() {
 
-                        let mut hasher = Sha256::new();
-                        hasher.update(blank_string.as_bytes());
+                    let value_v =  match value {
+                        Value::String(_) => value.clone() ,
+                        Value::Array(a) => { let x = a[0].as_object().unwrap();
+                            if x.contains_key("datatype") {
+                                    datatype = x.get("datatype").unwrap().as_str().unwrap().to_string();
+                                    x.get("object").unwrap().clone()
+                            } else {
+                                value.clone()
+                            }
+                        },
+                        Value::Object(x) => { if x.contains_key("datatype")
+                            && x.get("datatype").unwrap().as_str().unwrap() == "_IRI" {
+                                datatype = "_IRI".to_string();
+                                x.get("object").unwrap().clone()
+                            } else {
+                                value.clone()
+                            }},
+                        _ => value.clone()
+                    };
 
-                        let blank_node_a =  hasher.finalize();
-                        let blank_node = format!("<ldtab:blanknode:{:x}>", blank_node_a);
-
-                        //println!("Blank node id: {}", blank_node);
-                        //println!("Blank node string: {}", blank_string);
-
-                        let mut datatype = t.6.clone();
-
-                        for (key, value) in map.iter() {
-
-                           let value_v =  match value {
-                                Value::String(s) => value.clone() ,
-                                Value::Array(a) => { let x = a[0].as_object().unwrap();
-                                    if x.contains_key("datatype")
-                                        && x.get("datatype").unwrap().as_str().unwrap() == "_IRI" {
-                                            datatype = "_IRI".to_string();
-                                            x.get("object").unwrap().clone()
-                                        }
-                                    else if x.contains_key("datatype")
-                                        && x.get("datatype").unwrap().as_str().unwrap() == "_JSONLIST" {
-                                            datatype = "_JSONLIST".to_string();
-                                            x.get("object").unwrap().clone()
-                                        }
-                                    else {
-                                        value.clone()
-                                    }
-                                },
-                                Value::Object(x) => { if x.contains_key("datatype")
-                                    && x.get("datatype").unwrap().as_str().unwrap() == "_IRI" {
-                                        datatype = "_IRI".to_string();
-                                        x.get("object").unwrap().clone()
-                                        } else {
-                                            value.clone()
-                                        }},
-                                _ => value.clone()
-                           };
-
-                            let ldtab = json!({
-                                "assertion":"1",
-                                "retraction": "0",
-                                "graph": "graph",
-                                "subject": blank_node,
-                                "predicate": key,
-                                "object": value_v,
-                                "datatype": datatype,
-                                "annotation": Value::Null
-                            });
-                            new_ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
-                        }
-
-                        let ldtab = json!({
-                            "assertion": "1",
-                            "retraction": "0",
-                            "graph": "graph",
-                            "subject": blank_node,
-                            "predicate": t.4,
-                            "object": parse_json_from_string(&t.5),
-                            "datatype": t.6,
-                            "annotation": parse_json_from_string(&t.7)
-                        });
-                        new_ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
-                    } else {
-                        new_ldtab_triples.push(t.clone());
-                    }
-
-                } else {
-                    new_ldtab_triples.push(t.clone());
-                }            
-            },
-            Err(e) => {
-                    new_ldtab_triples.push(t.clone());
-
-            },
+                    let ldtab = json!({
+                        "assertion":"1",
+                        "retraction": "0",
+                        "graph": "graph",
+                        "subject": t.3,
+                        "predicate": key,
+                        "object": value_v,
+                        "datatype": datatype,
+                        "annotation": Value::Null
+                    });
+                    new_ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+                }
+            }
         }
 
+        if s.is_object() {
+            //blank node as subject
+            if let Value::Object(map) = s.clone() {
+
+                let blank = Value::Object(map.clone());
+                let blank_sorted = wiring_rs::ofn_2_ldtab::util::sort_value(&blank);
+                let blank_string = blank_sorted.to_string();
+
+                let mut hasher = Sha256::new();
+                hasher.update(blank_string.as_bytes());
+
+                let blank_node_a =  hasher.finalize();
+                let blank_node = format!("<ldtab:blanknode:{:x}>", blank_node_a);
+
+                let mut datatype = t.6.clone();
+
+                for (key, value) in map.iter() {
+
+                    let value_v =  match value {
+                        Value::String(_) => value.clone() ,
+                        Value::Array(a) => { let x = a[0].as_object().unwrap();
+                            if x.contains_key("datatype") {
+                                    datatype = x.get("datatype").unwrap().as_str().unwrap().to_string();
+                                    x.get("object").unwrap().clone()
+                            } else {
+                                value.clone()
+                            }
+                        },
+                        Value::Object(x) => { if x.contains_key("datatype")
+                            && x.get("datatype").unwrap().as_str().unwrap() == "_IRI" {
+                                datatype = "_IRI".to_string();
+                                x.get("object").unwrap().clone()
+                            } else {
+                                value.clone()
+                            }},
+                        _ => value.clone()
+                    };
+
+                    let ldtab = json!({
+                        "assertion":"1",
+                        "retraction": "0",
+                        "graph": "graph",
+                        "subject": blank_node,
+                        "predicate": key,
+                        "object": value_v,
+                        "datatype": datatype,
+                        "annotation": Value::Null
+                    });
+                    new_ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+                }
+
+                let ldtab = json!({
+                    "assertion": "1",
+                    "retraction": "0",
+                    "graph": "graph",
+                    "subject": blank_node,
+                    "predicate": t.4,
+                    "object": parse_json_from_string(&t.5),
+                    "datatype": t.6,
+                    "annotation": parse_json_from_string(&t.7)
+                });
+                new_ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+            }
+        }
+
+        //normal triple
+        if !is_ldtab_blanknode(&s) && !s.is_object() {
+            new_ldtab_triples.push(t.clone());
+        }
 
     });
 
