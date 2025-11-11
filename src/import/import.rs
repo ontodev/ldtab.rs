@@ -630,18 +630,26 @@ fn json_value_to_string(json_value: &Value) -> String {
 }
 
 fn get_annotation(value: &Value) -> String {
-    let annotation = value.get("annotation").unwrap();
-    match annotation {
-        Value::Object(map) => {
-            if map.is_empty() {
+    match value.get("annotation") {
+        None | Some(Value::Null) => String::new(),
+
+        Some(Value::String(s)) => {
+            if s.is_empty() {
                 String::new()
+            } else if let Ok(inner) = serde_json::from_str::<Value>(s) {
+                // Parsed successfully: return the actual JSON (no extra escaping)
+                inner.to_string()
             } else {
-                annotation.to_string()
+                // Not JSON, just return the raw string
+                s.clone()
             }
         }
-        _ => String::new(),
+
+        Some(Value::Object(map)) if map.is_empty() => String::new(),
+        Some(v) => v.to_string(),
     }
 }
+
 
 pub fn is_ldtab_blanknode(input: &Value) -> bool {
     input
