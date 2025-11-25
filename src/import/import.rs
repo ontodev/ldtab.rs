@@ -200,7 +200,6 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
-        //TODO: SHA256 hash
         for triple in ldtab.as_array().unwrap() {
             ldtab_triples.push(ldtab_2_tuple(&triple).unwrap());
         }
@@ -214,7 +213,12 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
         //handle ldtab blank nodes 
         let s = parse_json_from_string(&t.3);
-        let o = parse_json_from_string(&t.5);
+        let o =
+            if t.6 == "_JSONMAP" || t.6 == "_JSONLIST" {
+                parse_json_from_string(&t.5)
+            } else {
+                Value::String(t.5.clone())
+            };
 
         if is_ldtab_blanknode(&s) {
             //&& datatype_obj.unwrap().as_str().unwrap() == "_JSONMAP" { //subject is already a blank node
@@ -256,7 +260,11 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
                     });
                     new_ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
                 }
+            } else {
+                //normal triple with blank node subject
+                new_ldtab_triples.push(t.clone());
             }
+
         }
 
         if s.is_object() {
@@ -335,16 +343,25 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
     let mut ldtab_triples = Vec::new();
 
     new_ldtab_triples.iter().for_each(|t| {
+
+        let o =
+            if t.6 == "_JSONMAP" || t.6 == "_JSONLIST" {
+                parse_json_from_string(&t.5)
+            } else {
+                Value::String(t.5.clone())
+            };
+
         let ldtab = json!({
             "assertion": "1",
             "retraction": "0",
             "graph": t.2,
             "subject": t.3,
             "predicate": t.4,
-            "object": t.5,
+            "object": o,
             "datatype": t.6,
             "annotation": t.7
         });
+
 
         let ldtab_curified = curify_ldtab_with(&ldtab, &map);
 
