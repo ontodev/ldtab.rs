@@ -88,6 +88,8 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
         map.insert(base, prefix);
     }
 
+    let prefix_map = map.clone();
+
     //convert OWL to LDTab
     let mut ldtab_triples = Vec::new();
     let count = ontology.iter().count();
@@ -200,8 +202,44 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
+        //handle blank nodes in rules
+        let mut m = Map::new();
         for triple in ldtab.as_array().unwrap() {
-            ldtab_triples.push(ldtab_2_tuple(&triple).unwrap());
+            let predicate = triple.get("predicate").unwrap().as_str().unwrap();
+            let object = triple.get("object").unwrap();
+            let datatype = triple.get("datatype").unwrap().as_str().unwrap();
+            let ooo = json!([{"datatype":datatype,"object":object}]);
+
+            m.insert(predicate.to_string(), ooo);
+        }
+
+        let blank = Value::Object(m);
+        //let blank = json!({"datatype":"_JSONMAP","object": blank});
+        let blank = uncurify_ldtab_with(&blank, &prefix_map);
+        let blank_sorted = wiring_rs::ofn_2_ldtab::util::sort_value(&blank);
+        let blank_string = blank_sorted.to_string();
+        println!("blank_string: {}", blank_string);
+
+        let mut hasher = Sha256::new();
+        hasher.update(blank_string.as_bytes());
+
+        let blank_node_a =  hasher.finalize();
+        let blank_node = format!("<ldtab:blanknode:{:x}>", blank_node_a);
+        println!("blank_node: {}", blank_node);
+
+        for triple in ldtab.as_array().unwrap() {
+            let ldtab = json!({
+                "assertion":"1",
+                "retraction": "0",
+                "graph": "graph",
+                "subject": blank_node,
+                "predicate": triple.get("predicate").unwrap(),
+                "object": triple.get("object").unwrap(),
+                "datatype": triple.get("datatype").unwrap(),
+                "annotation": triple.get("annotation").unwrap()
+            });
+
+            ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
         }
     });
 
@@ -213,6 +251,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
         //handle ldtab blank nodes 
         let s = parse_json_from_string(&t.3);
+        let p = parse_json_from_string(&t.4);
         let o =
             if t.6 == "_JSONMAP" || t.6 == "_JSONLIST" {
                 parse_json_from_string(&t.5)
@@ -223,7 +262,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
         if is_ldtab_blanknode(&s) {
             //&& datatype_obj.unwrap().as_str().unwrap() == "_JSONMAP" { //subject is already a blank node
 
-            if let Value::Object(map) = o {
+            if let Value::Object(map) = o.clone() {
 
                 let mut datatype = t.6.clone();
                 for (key, value) in map.iter() {
@@ -269,11 +308,36 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
         if s.is_object() {
             //blank node as subject
-            if let Value::Object(map) = s.clone() {
+            //&& p == "<http://www.w3.org/2002/07/owl#disjointWith>"
+            if let Value::Object(map) = s.clone()  {
 
-                let blank = Value::Object(map.clone());
+                let mut m = map.clone();
+                //let blank = Value::Object(map.clone());
+
+                let ooo = json!([{"datatype":t.6,"object":o.clone()}]);
+
+
+                if p == "owl:disjointWith" {
+                    m.insert("<http://www.w3.org/2002/07/owl#disjointWith>".to_string(), ooo.clone());
+                }
+
+                if p == "rdfs:subClassOf" {
+                    m.insert("rdfs:subClassOf".to_string(), ooo.clone());
+                }
+
+                if p == "owl:equivalentClass" {
+                    m.insert("owl:equivalentClass".to_string(), ooo.clone());
+                }
+
+                if p == "owl:unionOf" {
+                    m.insert("owl:unionOf".to_string(), ooo.clone());
+                }
+
+                let blank = Value::Object(m);
+                let blank = uncurify_ldtab_with(&blank, &prefix_map);
                 let blank_sorted = wiring_rs::ofn_2_ldtab::util::sort_value(&blank);
                 let blank_string = blank_sorted.to_string();
+                //println!("blank_string: {}", blank_string);
 
                 let mut hasher = Sha256::new();
                 hasher.update(blank_string.as_bytes());
@@ -673,4 +737,71 @@ pub fn is_ldtab_blanknode(input: &Value) -> bool {
         .as_str()
         .map(|s| s.starts_with("<ldtab:blanknode"))
         .unwrap_or(false)
+}
+
+
+
+fn uncurify_ldtab_with(ldtab: &Value, iri2prefix: &HashMap<String, String>) -> Value {
+    // Invert iri2prefix (IRI base -> prefix) into prefix2iri (prefix -> IRI base)
+    let prefix2iri: HashMap<String, String> = iri2prefix
+        .iter()
+        .map(|(iri_base, prefix)| (prefix.clone(), iri_base.clone()))
+        .collect();
+
+    match ldtab {
+        Value::Array(vec) => {
+            let new_vec: Vec<Value> = vec
+                .iter()
+                .map(|item| uncurify_ldtab_with(item, iri2prefix))
+                .collect();
+            Value::Array(new_vec)
+        }
+        Value::Object(map) => {
+            let mut new_map = serde_json::Map::new();
+            for (key, value) in map.iter() {
+                let expanded_key = expand_curies(key, &prefix2iri);
+                new_map.insert(expanded_key, uncurify_ldtab_with(value, iri2prefix));
+            }
+            Value::Object(new_map)
+        }
+        Value::String(s) => Value::String(expand_curies(s, &prefix2iri)),
+        _ => ldtab.clone(),
+    }
+}
+
+fn expand_curies(input: &str, prefix2iri: &HashMap<String, String>) -> String {
+    let datatype = Regex::new("^\"(?s)(.*)\"\\^\\^(.*)$").unwrap();
+
+    // Expand whole-string CURIEs like "ex:Foo" -> "<http://...Foo>"
+    if let Some(expanded) = expand_curie_to_iri(input, prefix2iri) {
+        return expanded;
+    }
+
+    // Expand datatype CURIEs inside typed literals like "\"x\"^^ex:dt"
+    if datatype.is_match(input) {
+        if let Some(caps) = datatype.captures(input) {
+            let literal = &caps[1];
+            let dtype = &caps[2];
+
+            if let Some(expanded_dtype) = expand_curie_to_iri(dtype, prefix2iri) {
+                return format!("\"{}\"^^{}", literal, expanded_dtype);
+            }
+        }
+    }
+
+    input.to_string()
+}
+
+fn expand_curie_to_iri(curie: &str, prefix2iri: &HashMap<String, String>) -> Option<String> {
+    // Don't touch full IRIs already written as <...>
+    if is_full_iri(curie) {
+        return None;
+    }
+
+    let mut parts = curie.splitn(2, ':');
+    let prefix = parts.next()?;
+    let local = parts.next()?; // requires a colon to exist
+
+    let iri_base = prefix2iri.get(prefix)?;
+    Some(format!("<{}{}>", iri_base, local))
 }
