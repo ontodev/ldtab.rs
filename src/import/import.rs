@@ -214,18 +214,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
         }
 
         let blank = Value::Object(m);
-        //let blank = json!({"datatype":"_JSONMAP","object": blank});
-        let blank = uncurify_ldtab_with(&blank, &prefix_map);
-        let blank_sorted = wiring_rs::ofn_2_ldtab::util::sort_value(&blank);
-        let blank_string = blank_sorted.to_string();
-        println!("blank_string: {}", blank_string);
-
-        let mut hasher = Sha256::new();
-        hasher.update(blank_string.as_bytes());
-
-        let blank_node_a =  hasher.finalize();
-        let blank_node = format!("<ldtab:blanknode:{:x}>", blank_node_a);
-        println!("blank_node: {}", blank_node);
+        let blank_node = generate_blank_node_id(&blank, &prefix_map);
 
         for triple in ldtab.as_array().unwrap() {
             let ldtab = json!({
@@ -264,28 +253,8 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
             if let Value::Object(map) = o.clone() {
 
-                let mut datatype = t.6.clone();
                 for (key, value) in map.iter() {
-
-                    let value_v =  match value {
-                        Value::String(_) => value.clone() ,
-                        Value::Array(a) => { let x = a[0].as_object().unwrap();
-                            if x.contains_key("datatype") {
-                                    datatype = x.get("datatype").unwrap().as_str().unwrap().to_string();
-                                    x.get("object").unwrap().clone()
-                            } else {
-                                value.clone()
-                            }
-                        },
-                        Value::Object(x) => { if x.contains_key("datatype")
-                            && x.get("datatype").unwrap().as_str().unwrap() == "_IRI" {
-                                datatype = "_IRI".to_string();
-                                x.get("object").unwrap().clone()
-                            } else {
-                                value.clone()
-                            }},
-                        _ => value.clone()
-                    };
+                    let (value_v, datatype) = extract_value_and_datatype(value, &t.6);
 
                     let ldtab = json!({
                         "assertion":"1",
@@ -312,7 +281,6 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
             if let Value::Object(map) = s.clone()  {
 
                 let mut m = map.clone();
-                //let blank = Value::Object(map.clone());
 
                 let ooo = json!([{"datatype":t.6,"object":o.clone()}]);
 
@@ -334,40 +302,10 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
                 }
 
                 let blank = Value::Object(m);
-                let blank = uncurify_ldtab_with(&blank, &prefix_map);
-                let blank_sorted = wiring_rs::ofn_2_ldtab::util::sort_value(&blank);
-                let blank_string = blank_sorted.to_string();
-                //println!("blank_string: {}", blank_string);
-
-                let mut hasher = Sha256::new();
-                hasher.update(blank_string.as_bytes());
-
-                let blank_node_a =  hasher.finalize();
-                let blank_node = format!("<ldtab:blanknode:{:x}>", blank_node_a);
-
-                let mut datatype = t.6.clone();
+                let blank_node = generate_blank_node_id(&blank, &prefix_map);
 
                 for (key, value) in map.iter() {
-
-                    let value_v =  match value {
-                        Value::String(_) => value.clone() ,
-                        Value::Array(a) => { let x = a[0].as_object().unwrap();
-                            if x.contains_key("datatype") {
-                                    datatype = x.get("datatype").unwrap().as_str().unwrap().to_string();
-                                    x.get("object").unwrap().clone()
-                            } else {
-                                value.clone()
-                            }
-                        },
-                        Value::Object(x) => { if x.contains_key("datatype")
-                            && x.get("datatype").unwrap().as_str().unwrap() == "_IRI" {
-                                datatype = "_IRI".to_string();
-                                x.get("object").unwrap().clone()
-                            } else {
-                                value.clone()
-                            }},
-                        _ => value.clone()
-                    };
+                    let (value_v, datatype) = extract_value_and_datatype(value, &t.6);
 
                     let ldtab = json!({
                         "assertion":"1",
@@ -737,6 +675,42 @@ pub fn is_ldtab_blanknode(input: &Value) -> bool {
         .as_str()
         .map(|s| s.starts_with("<ldtab:blanknode"))
         .unwrap_or(false)
+}
+
+fn extract_value_and_datatype(value: &Value, default_datatype: &str) -> (Value, String) {
+    match value {
+        Value::String(_) => (value.clone(), default_datatype.to_string()),
+        Value::Array(a) if !a.is_empty() => {
+            if let Some(x) = a[0].as_object() {
+                if x.contains_key("datatype") {
+                    let datatype = x.get("datatype").unwrap().as_str().unwrap().to_string();
+                    let obj = x.get("object").unwrap().clone();
+                    return (obj, datatype);
+                }
+            }
+            (value.clone(), default_datatype.to_string())
+        }
+        Value::Object(x) => {
+            if x.contains_key("datatype") && x.get("datatype").unwrap().as_str() == Some("_IRI") {
+                let obj = x.get("object").unwrap().clone();
+                return (obj, "_IRI".to_string());
+            }
+            (value.clone(), default_datatype.to_string())
+        }
+        _ => (value.clone(), default_datatype.to_string()),
+    }
+}
+
+fn generate_blank_node_id(value: &Value, prefix_map: &HashMap<String, String>) -> String {
+    let expanded = uncurify_ldtab_with(value, prefix_map);
+    let sorted = wiring_rs::ofn_2_ldtab::util::sort_value(&expanded);
+    let json_string = sorted.to_string();
+
+    let mut hasher = Sha256::new();
+    hasher.update(json_string.as_bytes());
+    let hash = hasher.finalize();
+
+    format!("<ldtab:blanknode:{:x}>", hash)
 }
 
 
