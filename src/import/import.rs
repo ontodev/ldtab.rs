@@ -7,6 +7,7 @@ use horned_owl::io::owx::reader::*;
 use horned_owl::model::*;
 use horned_owl::ontology::set::SetOntology;
 use rayon::prelude::*;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use serde_json::json;
 use serde_json::{Value, Map, from_str};
@@ -25,6 +26,10 @@ use crate::owl_2_ofn;
 
 const SQLITE_MAX_VARIABLE_NUMBER: usize = 999;
 const NUM_COLUMNS: usize = 8;
+
+/// Regex to match typed literals
+static DATATYPE_LITERAL_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"^"(?s)(.*)"\^\^(.*)$"#).unwrap());
 
 
 pub async fn import(sub_matches: &ArgMatches) -> Result<()> {
@@ -571,8 +576,6 @@ fn curify_ldtab_with(ldtab :&Value, iri2prefix: &HashMap<String, String>) -> Val
 }
 
 fn replace_substrings(input: &str, iri2prefix: &HashMap<String, String>) -> String {
-    let datatype = Regex::new("^\"(?s)(.*)\"\\^\\^(.*)$").unwrap();
-
     if is_full_iri(input) {
         let trimmed = &input[1..input.len() - 1]; //remove angle brackets
         let mut result = trimmed.to_string();
@@ -591,8 +594,8 @@ fn replace_substrings(input: &str, iri2prefix: &HashMap<String, String>) -> Stri
         } else {
             input.to_string()
         }
-    } else if datatype.is_match(input) {
-        match datatype.captures(input) {
+    } else if DATATYPE_LITERAL_REGEX.is_match(input) {
+        match DATATYPE_LITERAL_REGEX.captures(input) {
             Some(x) => {
                 let literal = format!("{}", &x[1]);
                 let datatype_iri = &x[2];
@@ -744,16 +747,14 @@ fn uncurify_ldtab_with(ldtab: &Value, iri2prefix: &HashMap<String, String>) -> V
 }
 
 fn expand_curies(input: &str, prefix2iri: &HashMap<String, String>) -> String {
-    let datatype = Regex::new("^\"(?s)(.*)\"\\^\\^(.*)$").unwrap();
-
     // Expand whole-string CURIEs like "ex:Foo" -> "<http://...Foo>"
     if let Some(expanded) = expand_curie_to_iri(input, prefix2iri) {
         return expanded;
     }
 
     // Expand datatype CURIEs inside typed literals like "\"x\"^^ex:dt"
-    if datatype.is_match(input) {
-        if let Some(caps) = datatype.captures(input) {
+    if DATATYPE_LITERAL_REGEX.is_match(input) {
+        if let Some(caps) = DATATYPE_LITERAL_REGEX.captures(input) {
             let literal = &caps[1];
             let dtype = &caps[2];
 
