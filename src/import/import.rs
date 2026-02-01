@@ -31,6 +31,18 @@ const NUM_COLUMNS: usize = 8;
 static DATATYPE_LITERAL_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"^"(?s)(.*)"\^\^(.*)$"#).unwrap());
 
+#[derive(Debug, Clone)]
+struct LdTabTriple {
+    assertion: i32,
+    retraction: i32,
+    graph: String,
+    subject: String,
+    predicate: String,
+    object: String,
+    datatype: String,
+    annotation: String,
+}
+
 
 pub async fn import(sub_matches: &ArgMatches) -> Result<()> {
     let database = sub_matches.get_one::<String>("database");
@@ -96,7 +108,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
     let prefix_map = map.clone();
 
     //convert OWL to LDTab
-    let mut ldtab_triples = Vec::new();
+    let mut ldtab_triples: Vec<LdTabTriple> = Vec::new();
     let count = ontology.iter().count();
     println!("Number of axioms: {}", count);
 
@@ -141,11 +153,11 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
             t["predicate"] = json!("<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>");
             t["object"] = json!("<http://www.w3.org/2002/07/owl#Ontology>");
 
-            ldtab_triples.push(ldtab_2_tuple(&t).unwrap())
+            ldtab_triples.push(ldtab_2_triple(&t).unwrap())
         }
 
         if !(ldtab["object"] == "<unknown>"){
-            ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+            ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
         }
     });
 
@@ -156,7 +168,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
-        ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+        ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
     });
 
     //handle ontology annotations (the ontology's iri is not available in Horned-OWL's construct, so we add it here)
@@ -166,7 +178,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
-        ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+        ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
     });
 
 
@@ -197,7 +209,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
             "annotation": Value::Null
         });
 
-        ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+        ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
 
     }
 
@@ -233,24 +245,24 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
                 "annotation": triple.get("annotation").unwrap()
             });
 
-            ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+            ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
         }
     });
 
 
 
-    let mut new_ldtab_triples = Vec::new();
+    let mut new_ldtab_triples: Vec<LdTabTriple> = Vec::new();
 
     ldtab_triples.iter().for_each(|t| {
 
         //handle ldtab blank nodes 
-        let s = parse_json_from_string(&t.3);
-        let p = parse_json_from_string(&t.4);
+        let s = parse_json_from_string(&t.subject);
+        let p = parse_json_from_string(&t.predicate);
         let o =
-            if t.6 == "_JSONMAP" || t.6 == "_JSONLIST" {
-                parse_json_from_string(&t.5)
+            if t.datatype == "_JSONMAP" || t.datatype == "_JSONLIST" {
+                parse_json_from_string(&t.object)
             } else {
-                Value::String(t.5.clone())
+                Value::String(t.object.clone())
             };
 
         if is_ldtab_blanknode(&s) {
@@ -259,19 +271,19 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
             if let Value::Object(map) = o.clone() {
 
                 for (key, value) in map.iter() {
-                    let (value_v, datatype) = extract_value_and_datatype(value, &t.6);
+                    let (value_v, datatype) = extract_value_and_datatype(value, &t.datatype);
 
                     let ldtab = json!({
                         "assertion":"1",
                         "retraction": "0",
                         "graph": "graph",
-                        "subject": t.3,
+                        "subject": t.subject,
                         "predicate": key,
                         "object": value_v,
                         "datatype": datatype,
                         "annotation": Value::Null
                     });
-                    new_ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+                    new_ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
                 }
             } else {
                 //normal triple with blank node subject
@@ -287,7 +299,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
                 let mut m = map.clone();
 
-                let ooo = json!([{"datatype":t.6,"object":o.clone()}]);
+                let ooo = json!([{"datatype":t.datatype,"object":o.clone()}]);
 
 
                 if p == "owl:disjointWith" {
@@ -310,7 +322,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
                 let blank_node = generate_blank_node_id(&blank, &prefix_map);
 
                 for (key, value) in map.iter() {
-                    let (value_v, datatype) = extract_value_and_datatype(value, &t.6);
+                    let (value_v, datatype) = extract_value_and_datatype(value, &t.datatype);
 
                     let ldtab = json!({
                         "assertion":"1",
@@ -322,7 +334,7 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
                         "datatype": datatype,
                         "annotation": Value::Null
                     });
-                    new_ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+                    new_ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
                 }
 
                 let ldtab = json!({
@@ -330,12 +342,12 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
                     "retraction": "0",
                     "graph": "graph",
                     "subject": blank_node,
-                    "predicate": t.4,
-                    "object": parse_json_from_string(&t.5),
-                    "datatype": t.6,
-                    "annotation": parse_json_from_string(&t.7)
+                    "predicate": t.predicate,
+                    "object": parse_json_from_string(&t.object),
+                    "datatype": t.datatype,
+                    "annotation": parse_json_from_string(&t.annotation)
                 });
-                new_ldtab_triples.push(ldtab_2_tuple(&ldtab).unwrap());
+                new_ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
             }
         }
 
@@ -347,33 +359,33 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
     });
 
     //run curify_ldtab_with on all ldtab_triples
-    let mut ldtab_triples = Vec::new();
+    let mut ldtab_triples: Vec<LdTabTriple> = Vec::new();
 
     new_ldtab_triples.iter().for_each(|t| {
 
         let o =
-            if t.6 == "_JSONMAP" || t.6 == "_JSONLIST" {
-                parse_json_from_string(&t.5)
+            if t.datatype == "_JSONMAP" || t.datatype == "_JSONLIST" {
+                parse_json_from_string(&t.object)
             } else {
-                Value::String(t.5.clone())
+                Value::String(t.object.clone())
             };
 
         let ldtab = json!({
             "assertion": "1",
             "retraction": "0",
-            "graph": t.2,
-            "subject": t.3,
-            "predicate": t.4,
+            "graph": t.graph,
+            "subject": t.subject,
+            "predicate": t.predicate,
             "object": o,
-            "datatype": t.6,
-            "annotation": t.7
+            "datatype": t.datatype,
+            "annotation": t.annotation
         });
 
 
         let ldtab_curified = curify_ldtab_with(&ldtab, &map);
 
-        let tuple = ldtab_2_tuple(&ldtab_curified).unwrap();
-        ldtab_triples.push(tuple);
+        let triple = ldtab_2_triple(&ldtab_curified).unwrap();
+        ldtab_triples.push(triple);
 
     });
 
@@ -397,15 +409,15 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
             "INSERT INTO statement (assertion, retraction, graph, subject, predicate, object, datatype, annotation) ",
         );
 
-        query_builder.push_values(chunk, |mut b, tuple| {
-            b.push_bind(tuple.0)
-                .push_bind(tuple.1)
-                .push_bind(&tuple.2)
-                .push_bind(&tuple.3)
-                .push_bind(&tuple.4)
-                .push_bind(&tuple.5)
-                .push_bind(&tuple.6)
-                .push_bind(&tuple.7);
+        query_builder.push_values(chunk, |mut b, triple| {
+            b.push_bind(triple.assertion)
+                .push_bind(triple.retraction)
+                .push_bind(&triple.graph)
+                .push_bind(&triple.subject)
+                .push_bind(&triple.predicate)
+                .push_bind(&triple.object)
+                .push_bind(&triple.datatype)
+                .push_bind(&triple.annotation);
         });
 
         query_builder
@@ -503,49 +515,38 @@ where
 }
 
 
-fn owl_2_ldtab(ann_axiom: &AnnotatedComponent<ArcStr>, map : &HashMap<String, String>) -> std::io::Result<(i32, i32, String, String, String, String, String, String)> {
-
+fn owl_2_ldtab(ann_axiom: &AnnotatedComponent<ArcStr>, map: &HashMap<String, String>) -> std::io::Result<LdTabTriple> {
         let ofn = owl_2_ofn::transducer::translate(ann_axiom);
 
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
         let ldtab_curified = curify_ldtab_with(&ldtab, map);
 
-        ldtab_2_tuple(&ldtab_curified)
+        ldtab_2_triple(&ldtab_curified)
 }
 
 //TODO: wiring doesn't pull apart literals and language tags/datatypes
-fn ldtab_2_tuple(
-    value: &Value,
-) -> std::io::Result<(i32, i32, String, String, String, String, String, String)> {
-    //println!("value: {:?}", value);
-
-    // Extract "subject", "predicate", and "object" from the JSON object
-    //let assertion = value.get("assertion").unwrap().as_i64().unwrap();
-    //let retraction = value.get("retraction").unwrap().as_i64().unwrap();
+fn ldtab_2_triple(value: &Value) -> std::io::Result<LdTabTriple> {
     let assertion = string_to_i32(value.get("assertion").unwrap()).unwrap();
     let retraction = string_to_i32(value.get("retraction").unwrap()).unwrap();
 
     let graph = value.get("graph").unwrap().as_str().unwrap();
-
-    //let subject = value.get("subject").unwrap().as_str().unwrap();
     let subject = json_value_to_string(value.get("subject").unwrap());
-
     let predicate = value.get("predicate").unwrap().as_str().unwrap();
-    let object = json_value_to_string(value.get("object").unwrap()); //Object is already a String
+    let object = json_value_to_string(value.get("object").unwrap());
     let datatype = value.get("datatype").unwrap().as_str().unwrap();
     let annotation = get_annotation(value);
 
-    Ok((
-        assertion as i32,
-        retraction as i32,
-        graph.to_string(),
-        subject.to_string(),
-        predicate.to_string(),
+    Ok(LdTabTriple {
+        assertion,
+        retraction,
+        graph: graph.to_string(),
+        subject,
+        predicate: predicate.to_string(),
         object,
-        datatype.to_string(),
+        datatype: datatype.to_string(),
         annotation,
-    ))
+    })
 }
 
 fn curify_ldtab_with(ldtab :&Value, iri2prefix: &HashMap<String, String>) -> Value {
