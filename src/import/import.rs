@@ -80,14 +80,54 @@ pub async fn import(sub_matches: &ArgMatches) -> Result<()> {
 }
 
 async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> Result<()> {
-    let id = ontology.i();
+    let iri_value = extract_ontology_iri(ontology);
+    let prefix_map = load_prefix_map(pool).await?;
 
+    let count = ontology.iter().count();
+    println!("Number of axioms: {}", count);
+
+    // Split ontology into component types
+    let (imports, ontology_annotations, dl_safe_rules, ontology_id, normal) = 
+        split_ontology_components(ontology);
+
+    let start = Instant::now();
+
+    // Process component types into triples
+    let mut ldtab_triples = process_normal_axioms(&normal, &prefix_map);
+    ldtab_triples.extend(process_ontology_id(&ontology_id));
+    ldtab_triples.extend(process_imports(&imports, &iri_value));
+    ldtab_triples.extend(process_ontology_annotations(&ontology_annotations, &iri_value));
+    ldtab_triples.extend(process_swrl_rules(&dl_safe_rules, &prefix_map));
+
+    // Handle blank nodes
+    let ldtab_triples = process_blank_nodes(&ldtab_triples, &prefix_map);
+
+    // Curify all triples
+    let ldtab_triples = curify_triples(&ldtab_triples, &prefix_map);
+
+    let duration = start.elapsed();
+    println!("OWL2LDTab took: {:?}", duration);
+
+    // Insert into database
+    let time = Instant::now();
+    insert_triples_to_db(&ldtab_triples, pool).await?;
+    let duration = time.elapsed();
+    println!("Sqlite took: {:?}", duration);
+
+    Ok(())
+}
+
+/// Extracts the ontology IRI as a JSON Value.
+fn extract_ontology_iri(ontology: &SetOntology<ArcStr>) -> Value {
+    let id = ontology.i();
     let i = id.clone().the_ontology_id().unwrap().iri.unwrap();
     let ii = i.get(0..);
     let iri = "<".to_string() + ii.unwrap() + ">";
-    let iri_value = Value::String(String::from(iri));
+    Value::String(String::from(iri))
+}
 
-    //load prefixes
+/// Loads the prefix map from the database.
+async fn load_prefix_map(pool: &SqlitePool) -> Result<HashMap<String, String>> {
     let rows = sqlx::query(
         r#"
         SELECT * FROM prefix
@@ -97,23 +137,25 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
     .await
     .context("Failed to fetch rows from the table")?;
 
-    //initialize map for prefixes
     let mut map = HashMap::new();
     for row in rows {
         let base: String = row.get("base");
         let prefix: String = row.get("prefix");
         map.insert(base, prefix);
     }
+    Ok(map)
+}
 
-    let prefix_map = map.clone();
-
-    //convert OWL to LDTab
-    let mut ldtab_triples: Vec<LdTabTriple> = Vec::new();
-    let count = ontology.iter().count();
-    println!("Number of axioms: {}", count);
-
-
-    //split ontology
+/// Splits ontology components into separate vectors by type.
+fn split_ontology_components<'a>(
+    ontology: &'a SetOntology<ArcStr>,
+) -> (
+    Vec<&'a AnnotatedComponent<ArcStr>>,
+    Vec<&'a AnnotatedComponent<ArcStr>>,
+    Vec<&'a AnnotatedComponent<ArcStr>>,
+    Vec<&'a AnnotatedComponent<ArcStr>>,
+    Vec<&'a AnnotatedComponent<ArcStr>>,
+) {
     let mut imports = Vec::new();
     let mut ontology_annotations = Vec::new();
     let mut dl_safe_rules = Vec::new();
@@ -128,78 +170,110 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
             Component::Rule(_) => dl_safe_rules.push(ann_axiom),
             Component::OntologyID(_) => ontology_id.push(ann_axiom),
             _ => normal.push(ann_axiom),
-        }});
+        }
+    });
 
-    let start = Instant::now();
-    ldtab_triples.par_extend(
-        normal.par_iter()
-        .map(|ann_axiom| owl_2_ldtab(ann_axiom, &map))
+    (imports, ontology_annotations, dl_safe_rules, ontology_id, normal)
+}
+
+/// Processes normal axioms in parallel.
+fn process_normal_axioms(
+    normal: &[&AnnotatedComponent<ArcStr>],
+    prefix_map: &HashMap<String, String>,
+) -> Vec<LdTabTriple> {
+    normal
+        .par_iter()
+        .map(|ann_axiom| owl_2_ldtab(ann_axiom, prefix_map))
         .filter_map(|res| match res {
             Ok(t) => Some(t),
             Err(e) => {
                 println!("Error: {:?}", e);
                 None
             }
-        }));
+        })
+        .collect()
+}
 
-    //translate ontology ID
-    ontology_id.iter().for_each(|ann_axiom| {
+/// Processes ontology ID components.
+fn process_ontology_id(ontology_id: &[&AnnotatedComponent<ArcStr>]) -> Vec<LdTabTriple> {
+    let mut triples = Vec::new();
+
+    for ann_axiom in ontology_id {
         let ofn = owl_2_ofn::transducer::translate(ann_axiom);
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
-        //An "Ontology" object in Horned-OWL gets translated into two LDTab triples
+        // An "Ontology" object in Horned-OWL gets translated into two LDTab triples
         if ldtab["predicate"] == "<http://www.w3.org/2002/07/owl#versionIRI>" {
             let mut t = ldtab.clone();
             t["predicate"] = json!("<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>");
             t["object"] = json!("<http://www.w3.org/2002/07/owl#Ontology>");
-
-            ldtab_triples.push(ldtab_2_triple(&t).unwrap())
+            triples.push(ldtab_2_triple(&t).unwrap());
         }
 
-        if !(ldtab["object"] == "<unknown>"){
-            ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
+        if ldtab["object"] != "<unknown>" {
+            triples.push(ldtab_2_triple(&ldtab).unwrap());
         }
-    });
+    }
 
-    //handle imports (the ontology's iri is not available in Horned-OWL's construct, so we add it here)
-    imports.iter().for_each(|ann_axiom| {
-        let ofn = owl_2_ofn::transducer::translate(ann_axiom);
-        let ofn = Value::Array(vec![ofn[0].clone(), iri_value.clone(), ofn[1].clone()]);
+    triples
+}
 
-        let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
+/// Processes import statements.
+fn process_imports(
+    imports: &[&AnnotatedComponent<ArcStr>],
+    iri_value: &Value,
+) -> Vec<LdTabTriple> {
+    imports
+        .iter()
+        .map(|ann_axiom| {
+            let ofn = owl_2_ofn::transducer::translate(ann_axiom);
+            let ofn = Value::Array(vec![ofn[0].clone(), iri_value.clone(), ofn[1].clone()]);
+            let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
+            ldtab_2_triple(&ldtab).unwrap()
+        })
+        .collect()
+}
 
-        ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
-    });
+/// Processes ontology annotations.
+fn process_ontology_annotations(
+    ontology_annotations: &[&AnnotatedComponent<ArcStr>],
+    iri_value: &Value,
+) -> Vec<LdTabTriple> {
+    ontology_annotations
+        .iter()
+        .map(|ann_axiom| {
+            let ofn = owl_2_ofn::transducer::translate(ann_axiom);
+            let ofn = Value::Array(vec![ofn[0].clone(), iri_value.clone(), ofn[1].clone()]);
+            let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
+            ldtab_2_triple(&ldtab).unwrap()
+        })
+        .collect()
+}
 
-    //handle ontology annotations (the ontology's iri is not available in Horned-OWL's construct, so we add it here)
-    ontology_annotations.iter().for_each(|ann_axiom| {
-        let ofn = owl_2_ofn::transducer::translate(ann_axiom);
-        let ofn = Value::Array(vec![ofn[0].clone(), iri_value.clone(), ofn[1].clone()]);
+/// Processes SWRL rules including variable declarations.
+fn process_swrl_rules(
+    dl_safe_rules: &[&AnnotatedComponent<ArcStr>],
+    prefix_map: &HashMap<String, String>,
+) -> Vec<LdTabTriple> {
+    let mut triples = Vec::new();
 
-        let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
-
-        ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
-    });
-
-
-    //handle SWRL rules (a single rule is split into multiple LDTab triples)
+    // Collect all variables from rules
     let variables: HashSet<Variable<ArcStr>> = dl_safe_rules
         .iter()
         .flat_map(|ann_axiom| {
             let rule = match &ann_axiom.component {
                 Component::Rule(r) => r,
-                other => panic!(
-                    "Expected a Rule‐component, but found: {:?}", 
-                    other
-                ),
+                other => panic!("Expected a Rule-component, but found: {:?}", other),
             };
             get_rule_variables(rule)
         })
         .collect();
+
+    // Create type declarations for variables
     for var in &variables {
         let var_iri = format!("<{}>", var.0);
         let ldtab = json!({
-            "assertion":"1",
+            "assertion": "1",
             "retraction": "0",
             "graph": "graph",
             "subject": var_iri,
@@ -208,34 +282,30 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
             "datatype": "_IRI",
             "annotation": Value::Null
         });
-
-        ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
-
+        triples.push(ldtab_2_triple(&ldtab).unwrap());
     }
 
-    dl_safe_rules.iter().for_each(|ann_axiom| {
-
+    // Process each rule
+    for ann_axiom in dl_safe_rules {
         let ofn = owl_2_ofn::transducer::translate(ann_axiom);
-
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
-        //handle blank nodes in rules
+        // Build blank node content
         let mut m = Map::new();
         for triple in ldtab.as_array().unwrap() {
             let predicate = triple.get("predicate").unwrap().as_str().unwrap();
             let object = triple.get("object").unwrap();
             let datatype = triple.get("datatype").unwrap().as_str().unwrap();
-            let ooo = json!([{"datatype":datatype,"object":object}]);
-
+            let ooo = json!([{"datatype": datatype, "object": object}]);
             m.insert(predicate.to_string(), ooo);
         }
 
         let blank = Value::Object(m);
-        let blank_node = generate_blank_node_id(&blank, &prefix_map);
+        let blank_node = generate_blank_node_id(&blank, prefix_map);
 
         for triple in ldtab.as_array().unwrap() {
             let ldtab = json!({
-                "assertion":"1",
+                "assertion": "1",
                 "retraction": "0",
                 "graph": "graph",
                 "subject": blank_node,
@@ -244,37 +314,36 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
                 "datatype": triple.get("datatype").unwrap(),
                 "annotation": triple.get("annotation").unwrap()
             });
-
-            ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
+            triples.push(ldtab_2_triple(&ldtab).unwrap());
         }
-    });
+    }
 
+    triples
+}
 
-
+/// Processes blank nodes in triples, expanding JSON objects as subjects.
+fn process_blank_nodes(
+    ldtab_triples: &[LdTabTriple],
+    prefix_map: &HashMap<String, String>,
+) -> Vec<LdTabTriple> {
     let mut new_ldtab_triples: Vec<LdTabTriple> = Vec::new();
 
-    ldtab_triples.iter().for_each(|t| {
-
-        //handle ldtab blank nodes 
+    for t in ldtab_triples {
         let s = parse_json_from_string(&t.subject);
         let p = parse_json_from_string(&t.predicate);
-        let o =
-            if t.datatype == "_JSONMAP" || t.datatype == "_JSONLIST" {
-                parse_json_from_string(&t.object)
-            } else {
-                Value::String(t.object.clone())
-            };
+        let o = if t.datatype == "_JSONMAP" || t.datatype == "_JSONLIST" {
+            parse_json_from_string(&t.object)
+        } else {
+            Value::String(t.object.clone())
+        };
 
         if is_ldtab_blanknode(&s) {
-            //&& datatype_obj.unwrap().as_str().unwrap() == "_JSONMAP" { //subject is already a blank node
-
             if let Value::Object(map) = o.clone() {
-
                 for (key, value) in map.iter() {
                     let (value_v, datatype) = extract_value_and_datatype(value, &t.datatype);
 
                     let ldtab = json!({
-                        "assertion":"1",
+                        "assertion": "1",
                         "retraction": "0",
                         "graph": "graph",
                         "subject": t.subject,
@@ -286,46 +355,34 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
                     new_ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
                 }
             } else {
-                //normal triple with blank node subject
                 new_ldtab_triples.push(t.clone());
             }
-
-        }
-
-        if s.is_object() {
-            //blank node as subject
-            //&& p == "<http://www.w3.org/2002/07/owl#disjointWith>"
-            if let Value::Object(map) = s.clone()  {
-
+        } else if s.is_object() {
+            if let Value::Object(map) = s.clone() {
                 let mut m = map.clone();
-
-                let ooo = json!([{"datatype":t.datatype,"object":o.clone()}]);
-
+                let ooo = json!([{"datatype": t.datatype, "object": o.clone()}]);
 
                 if p == "owl:disjointWith" {
                     m.insert("<http://www.w3.org/2002/07/owl#disjointWith>".to_string(), ooo.clone());
                 }
-
                 if p == "rdfs:subClassOf" {
                     m.insert("rdfs:subClassOf".to_string(), ooo.clone());
                 }
-
                 if p == "owl:equivalentClass" {
                     m.insert("owl:equivalentClass".to_string(), ooo.clone());
                 }
-
                 if p == "owl:unionOf" {
                     m.insert("owl:unionOf".to_string(), ooo.clone());
                 }
 
                 let blank = Value::Object(m);
-                let blank_node = generate_blank_node_id(&blank, &prefix_map);
+                let blank_node = generate_blank_node_id(&blank, prefix_map);
 
                 for (key, value) in map.iter() {
                     let (value_v, datatype) = extract_value_and_datatype(value, &t.datatype);
 
                     let ldtab = json!({
-                        "assertion":"1",
+                        "assertion": "1",
                         "retraction": "0",
                         "graph": "graph",
                         "subject": blank_node,
@@ -349,62 +406,55 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
                 });
                 new_ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
             }
-        }
-
-        //normal triple
-        if !is_ldtab_blanknode(&s) && !s.is_object() {
+        } else {
             new_ldtab_triples.push(t.clone());
         }
+    }
 
-    });
+    new_ldtab_triples
+}
 
-    //run curify_ldtab_with on all ldtab_triples
-    let mut ldtab_triples: Vec<LdTabTriple> = Vec::new();
-
-    new_ldtab_triples.iter().for_each(|t| {
-
-        let o =
-            if t.datatype == "_JSONMAP" || t.datatype == "_JSONLIST" {
+/// Applies CURIE compression to all triples.
+fn curify_triples(
+    triples: &[LdTabTriple],
+    prefix_map: &HashMap<String, String>,
+) -> Vec<LdTabTriple> {
+    triples
+        .iter()
+        .map(|t| {
+            let o = if t.datatype == "_JSONMAP" || t.datatype == "_JSONLIST" {
                 parse_json_from_string(&t.object)
             } else {
                 Value::String(t.object.clone())
             };
 
-        let ldtab = json!({
-            "assertion": "1",
-            "retraction": "0",
-            "graph": t.graph,
-            "subject": t.subject,
-            "predicate": t.predicate,
-            "object": o,
-            "datatype": t.datatype,
-            "annotation": t.annotation
-        });
+            let ldtab = json!({
+                "assertion": "1",
+                "retraction": "0",
+                "graph": t.graph,
+                "subject": t.subject,
+                "predicate": t.predicate,
+                "object": o,
+                "datatype": t.datatype,
+                "annotation": t.annotation
+            });
 
+            let ldtab_curified = curify_ldtab_with(&ldtab, prefix_map);
+            ldtab_2_triple(&ldtab_curified).unwrap()
+        })
+        .collect()
+}
 
-        let ldtab_curified = curify_ldtab_with(&ldtab, &map);
-
-        let triple = ldtab_2_triple(&ldtab_curified).unwrap();
-        ldtab_triples.push(triple);
-
-    });
-
-    let duration = start.elapsed();
-    println!("OWL2LDTab took: {:?}", duration);
-
-    let time = Instant::now();
-
-    // Insert LDTab triples into the database
-    // (in chunks - the QueryBuilder can only handle a limited number of parameters at once)
+/// Inserts triples into the database in chunks.
+async fn insert_triples_to_db(triples: &[LdTabTriple], pool: &SqlitePool) -> Result<()> {
     let mut start = 0;
-    while start < ldtab_triples.len() {
+    while start < triples.len() {
         let end = std::cmp::min(
             start + SQLITE_MAX_VARIABLE_NUMBER / NUM_COLUMNS,
-            ldtab_triples.len(),
+            triples.len(),
         );
-        let chunk = &ldtab_triples[start..end];
+        let chunk = &triples[start..end];
 
-        //TODO: parameterize table
         let mut query_builder = QueryBuilder::new(
             "INSERT INTO statement (assertion, retraction, graph, subject, predicate, object, datatype, annotation) ",
         );
@@ -428,10 +478,6 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
         start = end;
     }
-
-    let duration = time.elapsed();
-    println!("Sqlite took: {:?}", duration);
-
     Ok(())
 }
 
