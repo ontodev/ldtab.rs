@@ -27,9 +27,87 @@ use crate::owl_2_ofn;
 const SQLITE_MAX_VARIABLE_NUMBER: usize = 999;
 const NUM_COLUMNS: usize = 8;
 
+// RDF/OWL IRIs
+const RDF_TYPE: &str = "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>";
+const OWL_VERSION_IRI: &str = "<http://www.w3.org/2002/07/owl#versionIRI>";
+const OWL_ONTOLOGY: &str = "<http://www.w3.org/2002/07/owl#Ontology>";
+const OWL_DISJOINT_WITH: &str = "<http://www.w3.org/2002/07/owl#disjointWith>";
+const SWRL_VARIABLE: &str = "<http://www.w3.org/2003/11/swrl#Variable>";
+
+// CURIE predicates (used in comparisons after curification)
+const CURIE_DISJOINT_WITH: &str = "owl:disjointWith";
+const CURIE_SUBCLASS_OF: &str = "rdfs:subClassOf";
+const CURIE_EQUIVALENT_CLASS: &str = "owl:equivalentClass";
+const CURIE_UNION_OF: &str = "owl:unionOf";
+
+// LDTab datatypes
+const DATATYPE_IRI: &str = "_IRI";
+const DATATYPE_JSONMAP: &str = "_JSONMAP";
+const DATATYPE_JSONLIST: &str = "_JSONLIST";
+
+// Default values
+const DEFAULT_GRAPH: &str = "graph";
+const UNKNOWN_VALUE: &str = "<unknown>";
+const ASSERTION_TRUE: &str = "1";
+const ASSERTION_FALSE: &str = "0";
+const RETRACTION_TRUE: &str = "1";
+const RETRACTION_FALSE: &str = "0";
+
 /// Regex to match typed literals
 static DATATYPE_LITERAL_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"^"(?s)(.*)"\^\^(.*)$"#).unwrap());
+
+/// Builder for creating LdTab JSON objects
+struct LdTabJsonBuilder {
+    graph: String,
+    subject: Value,
+    predicate: Value,
+    object: Value,
+    datatype: String,
+    annotation: Value,
+}
+
+impl LdTabJsonBuilder {
+
+    fn new(
+        subject: impl Into<Value>,
+        predicate: impl Into<Value>,
+        object: impl Into<Value>,
+        datatype: &str,
+    ) -> Self {
+        Self {
+            graph: DEFAULT_GRAPH.to_string(),
+            subject: subject.into(),
+            predicate: predicate.into(),
+            object: object.into(),
+            datatype: datatype.to_string(),
+            annotation: Value::Null,
+        }
+    }
+
+    fn graph(mut self, graph: &str) -> Self {
+        self.graph = graph.to_string();
+        self
+    }
+
+    fn annotation(mut self, annotation: impl Into<Value>) -> Self {
+        self.annotation = annotation.into();
+        self
+    }
+
+    fn build(self) -> Value {
+        json!({
+            "assertion": ASSERTION_TRUE,
+            "retraction": RETRACTION_FALSE,
+            "graph": self.graph,
+            "subject": self.subject,
+            "predicate": self.predicate,
+            "object": self.object,
+            "datatype": self.datatype,
+            "annotation": self.annotation
+        })
+    }
+}
 
 #[derive(Debug, Clone)]
 struct LdTabTriple {
@@ -203,14 +281,14 @@ fn process_ontology_id(ontology_id: &[&AnnotatedComponent<ArcStr>]) -> Vec<LdTab
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
         // An "Ontology" object in Horned-OWL gets translated into two LDTab triples
-        if ldtab["predicate"] == "<http://www.w3.org/2002/07/owl#versionIRI>" {
+        if ldtab["predicate"] == OWL_VERSION_IRI {
             let mut t = ldtab.clone();
-            t["predicate"] = json!("<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>");
-            t["object"] = json!("<http://www.w3.org/2002/07/owl#Ontology>");
+            t["predicate"] = json!(RDF_TYPE);
+            t["object"] = json!(OWL_ONTOLOGY);
             triples.push(ldtab_2_triple(&t).unwrap());
         }
 
-        if ldtab["object"] != "<unknown>" {
+        if ldtab["object"] != UNKNOWN_VALUE {
             triples.push(ldtab_2_triple(&ldtab).unwrap());
         }
     }
@@ -272,16 +350,8 @@ fn process_swrl_rules(
     // Create type declarations for variables
     for var in &variables {
         let var_iri = format!("<{}>", var.0);
-        let ldtab = json!({
-            "assertion": "1",
-            "retraction": "0",
-            "graph": "graph",
-            "subject": var_iri,
-            "predicate": "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>",
-            "object": "<http://www.w3.org/2003/11/swrl#Variable>",
-            "datatype": "_IRI",
-            "annotation": Value::Null
-        });
+        let ldtab = LdTabJsonBuilder::new(var_iri, RDF_TYPE, SWRL_VARIABLE, DATATYPE_IRI)
+            .build();
         triples.push(ldtab_2_triple(&ldtab).unwrap());
     }
 
@@ -304,16 +374,14 @@ fn process_swrl_rules(
         let blank_node = generate_blank_node_id(&blank, prefix_map);
 
         for triple in ldtab.as_array().unwrap() {
-            let ldtab = json!({
-                "assertion": "1",
-                "retraction": "0",
-                "graph": "graph",
-                "subject": blank_node,
-                "predicate": triple.get("predicate").unwrap(),
-                "object": triple.get("object").unwrap(),
-                "datatype": triple.get("datatype").unwrap(),
-                "annotation": triple.get("annotation").unwrap()
-            });
+            let ldtab = LdTabJsonBuilder::new(
+                blank_node.clone(),
+                triple.get("predicate").unwrap().clone(),
+                triple.get("object").unwrap().clone(),
+                triple.get("datatype").unwrap().as_str().unwrap(),
+            )
+            .annotation(triple.get("annotation").unwrap().clone())
+            .build();
             triples.push(ldtab_2_triple(&ldtab).unwrap());
         }
     }
@@ -331,7 +399,7 @@ fn process_blank_nodes(
     for t in ldtab_triples {
         let s = parse_json_from_string(&t.subject);
         let p = parse_json_from_string(&t.predicate);
-        let o = if t.datatype == "_JSONMAP" || t.datatype == "_JSONLIST" {
+        let o = if t.datatype == DATATYPE_JSONMAP || t.datatype == DATATYPE_JSONLIST {
             parse_json_from_string(&t.object)
         } else {
             Value::String(t.object.clone())
@@ -342,16 +410,8 @@ fn process_blank_nodes(
                 for (key, value) in map.iter() {
                     let (value_v, datatype) = extract_value_and_datatype(value, &t.datatype);
 
-                    let ldtab = json!({
-                        "assertion": "1",
-                        "retraction": "0",
-                        "graph": "graph",
-                        "subject": t.subject,
-                        "predicate": key,
-                        "object": value_v,
-                        "datatype": datatype,
-                        "annotation": Value::Null
-                    });
+                    let ldtab = LdTabJsonBuilder::new(t.subject.clone(), key.clone(), value_v, &datatype)
+                        .build();
                     new_ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
                 }
             } else {
@@ -362,17 +422,17 @@ fn process_blank_nodes(
                 let mut m = map.clone();
                 let ooo = json!([{"datatype": t.datatype, "object": o.clone()}]);
 
-                if p == "owl:disjointWith" {
-                    m.insert("<http://www.w3.org/2002/07/owl#disjointWith>".to_string(), ooo.clone());
+                if p == CURIE_DISJOINT_WITH {
+                    m.insert(OWL_DISJOINT_WITH.to_string(), ooo.clone());
                 }
-                if p == "rdfs:subClassOf" {
-                    m.insert("rdfs:subClassOf".to_string(), ooo.clone());
+                if p == CURIE_SUBCLASS_OF {
+                    m.insert(CURIE_SUBCLASS_OF.to_string(), ooo.clone());
                 }
-                if p == "owl:equivalentClass" {
-                    m.insert("owl:equivalentClass".to_string(), ooo.clone());
+                if p == CURIE_EQUIVALENT_CLASS {
+                    m.insert(CURIE_EQUIVALENT_CLASS.to_string(), ooo.clone());
                 }
-                if p == "owl:unionOf" {
-                    m.insert("owl:unionOf".to_string(), ooo.clone());
+                if p == CURIE_UNION_OF {
+                    m.insert(CURIE_UNION_OF.to_string(), ooo.clone());
                 }
 
                 let blank = Value::Object(m);
@@ -381,29 +441,19 @@ fn process_blank_nodes(
                 for (key, value) in map.iter() {
                     let (value_v, datatype) = extract_value_and_datatype(value, &t.datatype);
 
-                    let ldtab = json!({
-                        "assertion": "1",
-                        "retraction": "0",
-                        "graph": "graph",
-                        "subject": blank_node,
-                        "predicate": key,
-                        "object": value_v,
-                        "datatype": datatype,
-                        "annotation": Value::Null
-                    });
+                    let ldtab = LdTabJsonBuilder::new(blank_node.clone(), key.clone(), value_v, &datatype)
+                        .build();
                     new_ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
                 }
 
-                let ldtab = json!({
-                    "assertion": "1",
-                    "retraction": "0",
-                    "graph": "graph",
-                    "subject": blank_node,
-                    "predicate": t.predicate,
-                    "object": parse_json_from_string(&t.object),
-                    "datatype": t.datatype,
-                    "annotation": parse_json_from_string(&t.annotation)
-                });
+                let ldtab = LdTabJsonBuilder::new(
+                    blank_node,
+                    t.predicate.clone(),
+                    parse_json_from_string(&t.object),
+                    &t.datatype,
+                )
+                .annotation(parse_json_from_string(&t.annotation))
+                .build();
                 new_ldtab_triples.push(ldtab_2_triple(&ldtab).unwrap());
             }
         } else {
@@ -422,22 +472,21 @@ fn curify_triples(
     triples
         .iter()
         .map(|t| {
-            let o = if t.datatype == "_JSONMAP" || t.datatype == "_JSONLIST" {
+            let o = if t.datatype == DATATYPE_JSONMAP || t.datatype == DATATYPE_JSONLIST {
                 parse_json_from_string(&t.object)
             } else {
                 Value::String(t.object.clone())
             };
 
-            let ldtab = json!({
-                "assertion": "1",
-                "retraction": "0",
-                "graph": t.graph,
-                "subject": t.subject,
-                "predicate": t.predicate,
-                "object": o,
-                "datatype": t.datatype,
-                "annotation": t.annotation
-            });
+            let ldtab = LdTabJsonBuilder::new(
+                t.subject.clone(),
+                t.predicate.clone(),
+                o,
+                &t.datatype,
+            )
+            .graph(&t.graph)
+            .annotation(t.annotation.clone())
+            .build();
 
             let ldtab_curified = curify_ldtab_with(&ldtab, prefix_map);
             ldtab_2_triple(&ldtab_curified).unwrap()
@@ -741,9 +790,9 @@ fn extract_value_and_datatype(value: &Value, default_datatype: &str) -> (Value, 
             (value.clone(), default_datatype.to_string())
         }
         Value::Object(x) => {
-            if x.contains_key("datatype") && x.get("datatype").unwrap().as_str() == Some("_IRI") {
+            if x.contains_key("datatype") && x.get("datatype").unwrap().as_str() == Some(DATATYPE_IRI) {
                 let obj = x.get("object").unwrap().clone();
-                return (obj, "_IRI".to_string());
+                return (obj, DATATYPE_IRI.to_string());
             }
             (value.clone(), default_datatype.to_string())
         }
