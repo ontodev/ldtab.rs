@@ -391,24 +391,16 @@ pub fn translate_doc_iri(axiom: &DocIRI<ArcStr>) -> Value {
 }
 
 pub fn translate_rule(axiom: &Rule<ArcStr>) -> Value {
-    let operator = Value::String(String::from("DLSafeRule"));
-
-    //translate body
-    let mut body = Vec::new();
-    body.push(Value::String(String::from("Body")));
-    for atom in &axiom.body {
-        body.push(expression_transducer::translate_atom(atom));
-    }
-
-    //translate head
-    let mut head = Vec::new();
-    head.push(Value::String(String::from("Head")));
-    for atom in &axiom.head {
-        head.push(expression_transducer::translate_atom(atom));
-    }
-
-    let v = vec![operator, Value::Array(body), Value::Array(head)];
-    Value::Array(v)
+    let body_operands: Vec<Value> = axiom.body.iter()
+        .map(|atom| expression_transducer::translate_atom(atom))
+        .collect();
+    let head_operands: Vec<Value> = axiom.head.iter()
+        .map(|atom| expression_transducer::translate_atom(atom))
+        .collect();
+    ofn_list("DLSafeRule", vec![
+        ofn_list("Body", body_operands),
+        ofn_list("Head", head_operands),
+    ])
 }
 
 pub fn translate_ontology_id(axiom: &OntologyID<ArcStr>) -> Value {
