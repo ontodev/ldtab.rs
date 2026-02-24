@@ -1,5 +1,5 @@
 use horned_owl::model::{
-    AnonymousIndividual, Atom, Class, ClassExpression, DArgument, DataProperty, DataRange,
+    AnnotationProperty, AnonymousIndividual, Atom, Class, ClassExpression, DArgument, DataProperty, DataRange,
     Datatype, FacetRestriction, IArgument, Individual, Literal, NamedIndividual, ObjectProperty,
     ObjectPropertyExpression, PropertyExpression, ArcStr, SubObjectPropertyExpression,
 };
@@ -30,7 +30,7 @@ pub fn translate_property_expression(expression: &PropertyExpression<ArcStr>) ->
     match expression {
         PropertyExpression::ObjectPropertyExpression(x) => translate_object_property_expression(&x),
         PropertyExpression::DataProperty(x) => translate_data_property(&x),
-        PropertyExpression::AnnotationProperty(_x) => json!("TODO"), //TODO
+        PropertyExpression::AnnotationProperty(x) => translate_annotation_property(&x),
     }
 }
 
@@ -51,6 +51,10 @@ pub fn translate_object_property(property: &ObjectProperty<ArcStr>) -> Value {
 }
 
 pub fn translate_data_property(property: &DataProperty<ArcStr>) -> Value {
+    format_iri(property.0.get(0..).unwrap())
+}
+
+pub fn translate_annotation_property(property: &AnnotationProperty<ArcStr>) -> Value {
     format_iri(property.0.get(0..).unwrap())
 }
 
