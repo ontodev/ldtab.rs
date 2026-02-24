@@ -302,7 +302,7 @@ pub fn translate_facet(facet: &Facet) -> Value {
 }
 
 pub fn translate_facet_restriction(facet_restriction: &FacetRestriction<ArcStr>) -> Value {
-    let operator = Value::String(String::from("FaceetRestriction"));
+    let operator = Value::String(String::from("FacetRestriction"));
 
     let facet = facet_restriction.f.clone();
     let facet = translate_facet(&facet);
