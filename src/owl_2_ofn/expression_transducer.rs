@@ -111,8 +111,7 @@ pub fn translate_object_one_of(arguments: &Vec<Individual<ArcStr>>) -> Value {
 }
 
 pub fn translate_object_complement(argument: &Box<ClassExpression<ArcStr>>) -> Value {
-    let expression: ClassExpression<ArcStr> = *argument.clone();
-    let argument = translate_class_expression(&expression);
+    let argument = translate_class_expression(&**argument);
     ofn_list("ObjectComplementOf", vec![argument])
 }
 
@@ -165,11 +164,10 @@ pub fn translate_object_cardinality(
     property: &ObjectPropertyExpression<ArcStr>,
     filler: &Box<ClassExpression<ArcStr>>,
 ) -> Value {
-    let expression: ClassExpression<ArcStr> = *filler.clone();
 
     let operator = Value::String(String::from(operator));
     let cardinality = json!(cardinality.to_string());
-    let filler = translate_class_expression(&expression);
+    let filler = translate_class_expression(&**filler);
     let property = translate_object_property_expression(property);
 
     let mut res = vec![operator];

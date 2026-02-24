@@ -36,11 +36,7 @@ pub fn translate_annotation_value(value: &AnnotationValue<ArcStr>) -> Value {
 }
 
 pub fn translate_annotation_set(annotation_set: &BTreeSet<Annotation<ArcStr>>) -> Vec<Value> {
-    let mut res = Vec::new();
-    for annotation in annotation_set {
-        res.push(translate_annotation(annotation));
-    }
-    res
+    annotation_set.iter().map(|a| translate_annotation(a)).collect()
 }
 
 //pub fn translate_annotation_set(annotation_set : &BTreeSet<Annotation>) -> Value {
