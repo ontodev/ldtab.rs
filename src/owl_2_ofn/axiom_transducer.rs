@@ -278,7 +278,6 @@ pub fn translate_datatype_definition(axiom: &DatatypeDefinition<ArcStr>) -> Valu
 }
 
 pub fn translate_has_key(axiom: &HasKey<ArcStr>) -> Value {
-    let operator = Value::String(String::from("HasKey"));
     let ce = expression_transducer::translate_class_expression(&axiom.ce);
 
     //NB: horned owl doesn't distinguish between object and data properties in hasKey
@@ -286,16 +285,11 @@ pub fn translate_has_key(axiom: &HasKey<ArcStr>) -> Value {
         .map(|x| expression_transducer::translate_property_expression(x))
         .collect();
 
-    // empty vector for third HasKey argument (datatype properties) 
-    let dummy = Vec::new();
-
-    let mut res = Vec::new();
-    res.push(operator);
-    res.push(ce);
-    res.push(Value::Array(operands));
-    res.push(Value::Array(dummy)); // no annotation support yet
-
-    Value::Array(res)
+    ofn_list("HasKey", vec![
+        ce,
+        Value::Array(operands),
+        Value::Array(Vec::new()), // empty datatype properties placeholder
+    ])
 }
 
 pub fn translate_same_individual(axiom: &SameIndividual<ArcStr>) -> Value {
