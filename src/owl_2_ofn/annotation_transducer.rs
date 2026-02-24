@@ -1,8 +1,8 @@
 use crate::owl_2_ofn::expression_transducer;
+use crate::owl_2_ofn::util::format_iri;
 use horned_owl::model::{
     Annotation, AnnotationProperty, AnnotationSubject, AnnotationValue, ArcStr,
 };
-use serde_json::json;
 use serde_json::Value;
 use std::collections::BTreeSet;
 
@@ -16,11 +16,7 @@ pub fn translate_annotation(annotation: &Annotation<ArcStr>) -> Value {
 
 pub fn translate_annotation_subject(annotation_subject: &AnnotationSubject<ArcStr>) -> Value {
     match annotation_subject {
-        AnnotationSubject::IRI(x) => {
-            let i = x.get(0..);
-            let iri = "<".to_string() + i.unwrap() + ">";
-            json!(iri)
-        }
+        AnnotationSubject::IRI(x) => format_iri(x.get(0..).unwrap()),
         AnnotationSubject::AnonymousIndividual(x) => {
             expression_transducer::translate_anonymous_individual(x)
         }
@@ -28,19 +24,13 @@ pub fn translate_annotation_subject(annotation_subject: &AnnotationSubject<ArcSt
 }
 
 pub fn translate_annotation_property(property: &AnnotationProperty<ArcStr>) -> Value {
-    let a = property.0.get(0..);
-    let iri = "<".to_string() + a.unwrap() + ">";
-    json!(iri)
+    format_iri(property.0.get(0..).unwrap())
 }
 
 pub fn translate_annotation_value(value: &AnnotationValue<ArcStr>) -> Value {
     match value {
         AnnotationValue::Literal(x) => expression_transducer::translate_literal(x),
-        AnnotationValue::IRI(x) => {
-            let i = x.get(0..);
-            let iri = "<".to_string() + i.unwrap() + ">";
-            json!(iri)
-        }
+        AnnotationValue::IRI(x) => format_iri(x.get(0..).unwrap()),
         AnnotationValue::AnonymousIndividual(x) => {
             expression_transducer::translate_anonymous_individual(x)
         }

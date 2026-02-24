@@ -7,6 +7,8 @@ use horned_owl::vocab::Facet;
 use serde_json::json;
 use serde_json::Value;
 
+use crate::owl_2_ofn::util::format_iri;
+
 pub fn translate_sub_object_property_expression(
     expression: &SubObjectPropertyExpression<ArcStr>,
 ) -> Value {
@@ -54,34 +56,24 @@ pub fn translate_inverse_object_property(property: &ObjectProperty<ArcStr>) -> V
 }
 
 pub fn translate_object_property(property: &ObjectProperty<ArcStr>) -> Value {
-    let a = property.0.get(0..);
-    let iri = "<".to_string() + a.unwrap() + ">";
-    json!(iri)
+    format_iri(property.0.get(0..).unwrap())
 }
 
 pub fn translate_data_property(property: &DataProperty<ArcStr>) -> Value {
-    let a = property.0.get(0..);
-    let iri = "<".to_string() + a.unwrap() + ">";
-    json!(iri)
+    format_iri(property.0.get(0..).unwrap())
 }
 
 pub fn translate_class(class: &Class<ArcStr>) -> Value {
-    let a = class.0.get(0..);
-    let iri = "<".to_string() + a.unwrap() + ">";
-    json!(iri)
+    format_iri(class.0.get(0..).unwrap())
 }
 
 //TODO: not sure this is correct
 pub fn translate_anonymous_individual(a: &AnonymousIndividual<ArcStr>) -> Value {
-    let an = a.0.get(0..);
-    let iri = "<".to_string() + an.unwrap() + ">";
-    json!(iri)
+    format_iri(a.0.get(0..).unwrap())
 }
 
 pub fn translate_named_individual(a: &NamedIndividual<ArcStr>) -> Value {
-    let an = a.0.get(0..);
-    let iri = "<".to_string() + an.unwrap() + ">";
-    json!(iri)
+    format_iri(a.0.get(0..).unwrap())
 }
 
 //TODO this is an IRI
@@ -105,8 +97,7 @@ pub fn translate_literal(literal: &Literal<ArcStr>) -> Value {
             literal,
             datatype_iri,
         } => {
-            let d = datatype_iri.get(0..);
-            let iri = "<".to_string() + d.unwrap() + ">";
+            let iri = format!("<{}>", datatype_iri.get(0..).unwrap());
             json!(format!("\"{}\"^^{}", literal, iri))
         }
     }
@@ -238,9 +229,7 @@ pub fn translate_object_cardinality(
 }
 
 pub fn translate_datatype(datatype: &Datatype<ArcStr>) -> Value {
-    let a = datatype.0.get(0..);
-    let iri = "<".to_string() + a.unwrap() + ">";
-    json!(iri)
+    format_iri(datatype.0.get(0..).unwrap())
 }
 
 pub fn translate_data_intersection_of(arguments: &Vec<DataRange<ArcStr>>) -> Value {

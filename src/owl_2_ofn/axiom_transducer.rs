@@ -1,5 +1,6 @@
 use crate::owl_2_ofn::annotation_transducer;
 use crate::owl_2_ofn::expression_transducer;
+use crate::owl_2_ofn::util::format_iri;
 use horned_owl::model::{
     AnnotationAssertion, AnnotationPropertyDomain, AnnotationPropertyRange,
     AsymmetricObjectProperty, ClassAssertion, Component, DataPropertyAssertion, DataPropertyDomain,
@@ -508,9 +509,7 @@ pub fn translate_sub_annotation_property_of(axiom: &SubAnnotationPropertyOf<ArcS
 pub fn translate_annotation_property_domain(axiom: &AnnotationPropertyDomain<ArcStr>) -> Value {
     let operator = Value::String(String::from("AnnotationPropertyDomain"));
     let property = annotation_transducer::translate_annotation_property(&axiom.ap);
-    let i = axiom.iri.get(0..);
-    let iri = "<".to_string() + i.unwrap() + ">";
-    let iri = json!(iri);
+    let iri = format_iri(axiom.iri.get(0..).unwrap());
     let v = vec![operator, property, iri];
     Value::Array(v)
 }
@@ -518,18 +517,14 @@ pub fn translate_annotation_property_domain(axiom: &AnnotationPropertyDomain<Arc
 pub fn translate_annotation_property_range(axiom: &AnnotationPropertyRange<ArcStr>) -> Value {
     let operator = Value::String(String::from("AnnotationPropertyRange"));
     let property = annotation_transducer::translate_annotation_property(&axiom.ap);
-    let i = axiom.iri.get(0..);
-    let iri = "<".to_string() + i.unwrap() + ">";
-    let iri = json!(iri);
+    let iri = format_iri(axiom.iri.get(0..).unwrap());
     let v = vec![operator, property, iri];
     Value::Array(v)
 }
 
 pub fn translate_doc_iri(axiom: &DocIRI<ArcStr>) -> Value {
     let operator = Value::String(String::from("DocIRI")); // this is not specified in OWL
-    let i = axiom.0.get(0..);
-    let iri = "<".to_string() + i.unwrap() + ">";
-    let iri = json!(iri);
+    let iri = format_iri(axiom.0.get(0..).unwrap());
     let v = vec![operator, iri];
     Value::Array(v)
 }
@@ -558,17 +553,9 @@ pub fn translate_rule(axiom: &Rule<ArcStr>) -> Value {
 pub fn translate_ontology_id(axiom: &OntologyID<ArcStr>) -> Value {
     let operator = Value::String(String::from("Ontology"));
     let i = axiom.iri.clone().unwrap();
-    let ii = i.get(0..);
-    let iri = "<".to_string() + ii.unwrap() + ">";
-    let iri = json!(iri);
+    let iri = format_iri(i.get(0..).unwrap());
 
-    let viri = json!(format!("<{}>", axiom.viri.as_deref().unwrap_or("unknown")));
-
-
-    //let version = axiom.viri.clone().unwrap();
-    //let vi = version.get(0..);
-    //let viri = "<".to_string() + vi.unwrap() + ">";
-    //let viri = json!(viri);
+    let viri = format_iri(axiom.viri.as_deref().unwrap_or("unknown"));
 
     let v = vec![operator, iri, viri];
     Value::Array(v)
