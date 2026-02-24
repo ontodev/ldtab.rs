@@ -7,20 +7,18 @@ use horned_owl::vocab::Facet;
 use serde_json::json;
 use serde_json::Value;
 
-use crate::owl_2_ofn::util::format_iri;
+use crate::owl_2_ofn::util::{format_iri, ofn_list};
 
 pub fn translate_sub_object_property_expression(
     expression: &SubObjectPropertyExpression<ArcStr>,
 ) -> Value {
     match expression {
         SubObjectPropertyExpression::ObjectPropertyChain(x) => {
-            let operator = Value::String(String::from("ObjectPropertyChain"));
-            let mut operands: Vec<Value> = x
+            let operands: Vec<Value> = x
                 .into_iter()
                 .map(|x| translate_object_property_expression(&x))
                 .collect();
-            operands.insert(0, operator);
-            Value::Array(operands)
+            ofn_list("ObjectPropertyChain", operands)
         }
         SubObjectPropertyExpression::ObjectPropertyExpression(x) => {
             translate_object_property_expression(&x)
@@ -44,15 +42,8 @@ pub fn translate_object_property_expression(expression: &ObjectPropertyExpressio
 }
 
 pub fn translate_inverse_object_property(property: &ObjectProperty<ArcStr>) -> Value {
-    let operator = Value::String(String::from("ObjectInverseOf"));
-    let mut res = vec![operator];
-
-    //let operand = Value::String(String::from(property.0.get(0..).unwrap()));
     let operand = translate_object_property(&property);
-
-    res.push(operand);
-
-    Value::Array(res)
+    ofn_list("ObjectInverseOf", vec![operand])
 }
 
 pub fn translate_object_property(property: &ObjectProperty<ArcStr>) -> Value {
@@ -104,93 +95,57 @@ pub fn translate_literal(literal: &Literal<ArcStr>) -> Value {
 }
 
 pub fn translate_n_ary_operator(operator: &str, arguments: &Vec<ClassExpression<ArcStr>>) -> Value {
-    let mut operands: Vec<Value> = arguments
+    let operands: Vec<Value> = arguments
         .into_iter()
         .map(|x| translate_class_expression(&x))
         .collect();
-    let operator = Value::String(String::from(operator));
-    operands.insert(0, operator);
-    Value::Array(operands)
+    ofn_list(operator, operands)
 }
 
 pub fn translate_object_one_of(arguments: &Vec<Individual<ArcStr>>) -> Value {
-    let mut operands: Vec<Value> = arguments
+    let operands: Vec<Value> = arguments
         .into_iter()
         .map(|x| translate_individual(&x))
         .collect();
-    let operator = Value::String(String::from("ObjectOneOf"));
-    operands.insert(0, operator);
-    Value::Array(operands)
+    ofn_list("ObjectOneOf", operands)
 }
 
 pub fn translate_object_complement(argument: &Box<ClassExpression<ArcStr>>) -> Value {
     let expression: ClassExpression<ArcStr> = *argument.clone();
     let argument = translate_class_expression(&expression);
-
-    let operator = Value::String(String::from("ObjectComplementOf"));
-    let mut res = vec![operator];
-    res.push(argument);
-
-    Value::Array(res)
+    ofn_list("ObjectComplementOf", vec![argument])
 }
 
 pub fn translate_object_some_values_from(
     property: &ObjectPropertyExpression<ArcStr>,
     filler: &Box<ClassExpression<ArcStr>>,
 ) -> Value {
-    let expression: ClassExpression<ArcStr> = *filler.clone();
-
-    let operator = Value::String(String::from("ObjectSomeValuesFrom"));
-    let filler = translate_class_expression(&expression);
+    let filler = translate_class_expression(&*filler);
     let property = translate_object_property_expression(property);
-
-    let mut res = vec![operator];
-    res.push(property);
-    res.push(filler);
-
-    Value::Array(res)
+    ofn_list("ObjectSomeValuesFrom", vec![property, filler])
 }
 
 pub fn translate_object_all_values_from(
     property: &ObjectPropertyExpression<ArcStr>,
     filler: &Box<ClassExpression<ArcStr>>,
 ) -> Value {
-    let expression: ClassExpression<ArcStr> = *filler.clone();
-
-    let operator = Value::String(String::from("ObjectAllValuesFrom"));
-    let filler = translate_class_expression(&expression);
+    let filler = translate_class_expression(&*filler);
     let property = translate_object_property_expression(property);
-
-    let mut res = vec![operator];
-    res.push(property);
-    res.push(filler);
-
-    Value::Array(res)
+    ofn_list("ObjectAllValuesFrom", vec![property, filler])
 }
 
 pub fn translate_object_has_value(
     property: &ObjectPropertyExpression<ArcStr>,
     value: &Individual<ArcStr>,
 ) -> Value {
-    let operator = Value::String(String::from("ObjectHasValue"));
     let value = translate_individual(value);
     let property = translate_object_property_expression(property);
-
-    let mut res = vec![operator];
-    res.push(property);
-    res.push(value);
-
-    Value::Array(res)
+    ofn_list("ObjectHasValue", vec![property, value])
 }
 
 pub fn translate_object_has_self(property: &ObjectPropertyExpression<ArcStr>) -> Value {
-    let operator = Value::String(String::from("ObjectHasSelf"));
     let property = translate_object_property_expression(property);
-
-    let mut res = vec![operator];
-    res.push(property);
-
-    Value::Array(res)
+    ofn_list("ObjectHasSelf", vec![property])
 }
 
 fn is_owl_thing(value: &Value) -> bool {
@@ -233,45 +188,32 @@ pub fn translate_datatype(datatype: &Datatype<ArcStr>) -> Value {
 }
 
 pub fn translate_data_intersection_of(arguments: &Vec<DataRange<ArcStr>>) -> Value {
-    let mut operands: Vec<Value> = arguments
+    let operands: Vec<Value> = arguments
         .into_iter()
         .map(|x| translate_data_range(&x))
         .collect();
-    let operator = Value::String(String::from("DataIntersectionOf"));
-    operands.insert(0, operator);
-    Value::Array(operands)
+    ofn_list("DataIntersectionOf", operands)
 }
 
 pub fn translate_data_union_of(arguments: &Vec<DataRange<ArcStr>>) -> Value {
-    let mut operands: Vec<Value> = arguments
+    let operands: Vec<Value> = arguments
         .into_iter()
         .map(|x| translate_data_range(&x))
         .collect();
-    let operator = Value::String(String::from("DataUnionOf"));
-    operands.insert(0, operator);
-    Value::Array(operands)
+    ofn_list("DataUnionOf", operands)
 }
 
 pub fn translate_data_complement_of(argument: &Box<DataRange<ArcStr>>) -> Value {
-    let range: DataRange<ArcStr> = *argument.clone();
-    let argument = translate_data_range(&range);
-
-    let operator = Value::String(String::from("DataComplementOf"));
-    let mut res = vec![operator];
-    res.push(argument);
-
-    Value::Array(res)
+    let argument = translate_data_range(&*argument);
+    ofn_list("DataComplementOf", vec![argument])
 }
 
 pub fn translate_data_one_of(arguments: &Vec<Literal<ArcStr>>) -> Value {
-    let mut operands: Vec<Value> = arguments
+    let operands: Vec<Value> = arguments
         .into_iter()
         .map(|x| translate_literal(&x))
         .collect();
-
-    let operator = Value::String(String::from("DataOneOf"));
-    operands.insert(0, operator);
-    Value::Array(operands)
+    ofn_list("DataOneOf", operands)
 }
 
 pub fn translate_facet(facet: &Facet) -> Value {
@@ -291,35 +233,22 @@ pub fn translate_facet(facet: &Facet) -> Value {
 }
 
 pub fn translate_facet_restriction(facet_restriction: &FacetRestriction<ArcStr>) -> Value {
-    let operator = Value::String(String::from("FacetRestriction"));
-
-    let facet = facet_restriction.f.clone();
-    let facet = translate_facet(&facet);
-
-    let literal = facet_restriction.l.clone();
-    let literal = translate_literal(&literal);
-
-    let mut res = vec![operator];
-    res.push(facet);
-    res.push(literal);
-
-    Value::Array(res)
+    let facet = translate_facet(&facet_restriction.f);
+    let literal = translate_literal(&facet_restriction.l);
+    ofn_list("FacetRestriction", vec![facet, literal])
 }
 
 pub fn translate_datatype_restriction(
     datatype: &Datatype<ArcStr>,
     facets: &Vec<FacetRestriction<ArcStr>>,
 ) -> Value {
-    let operator = Value::String(String::from("DatatypeRestriction"));
     let datatype = translate_datatype(datatype);
     let mut operands: Vec<Value> = facets
         .into_iter()
         .map(|x| translate_facet_restriction(&x))
         .collect();
-
     operands.insert(0, datatype);
-    operands.insert(0, operator);
-    Value::Array(operands)
+    ofn_list("DatatypeRestriction", operands)
 }
 
 pub fn translate_data_range(range: &DataRange<ArcStr>) -> Value {
@@ -339,42 +268,24 @@ pub fn translate_data_some_values_from(
     property: &DataProperty<ArcStr>,
     filler: &DataRange<ArcStr>,
 ) -> Value {
-    let operator = Value::String(String::from("DataSomeValuesFrom"));
     let filler = translate_data_range(&filler);
     let property = translate_data_property(property);
-
-    let mut res = vec![operator];
-    res.push(property);
-    res.push(filler);
-
-    Value::Array(res)
+    ofn_list("DataSomeValuesFrom", vec![property, filler])
 }
 
 pub fn translate_data_all_values_from(
     property: &DataProperty<ArcStr>,
     filler: &DataRange<ArcStr>,
 ) -> Value {
-    let operator = Value::String(String::from("DataAllValuesFrom"));
     let filler = translate_data_range(&filler);
     let property = translate_data_property(property);
-
-    let mut res = vec![operator];
-    res.push(property);
-    res.push(filler);
-
-    Value::Array(res)
+    ofn_list("DataAllValuesFrom", vec![property, filler])
 }
 
 pub fn translate_data_has_value(property: &DataProperty<ArcStr>, literal: &Literal<ArcStr>) -> Value {
-    let operator = Value::String(String::from("DataHasValue"));
     let value = translate_literal(literal);
     let property = translate_data_property(property);
-
-    let mut res = vec![operator];
-    res.push(property);
-    res.push(value);
-
-    Value::Array(res)
+    ofn_list("DataHasValue", vec![property, value])
 }
 
 fn is_rdfs_literal(value: &Value) -> bool {
@@ -413,84 +324,52 @@ pub fn translate_data_cardinality(
 pub fn translate_atom(atom: &Atom<ArcStr>) -> Value {
     match atom {
         Atom::BuiltInAtom { pred, args } => {
-            let operator = Value::String(String::from("BuiltInAtom"));
-
-            let a = pred.get(0..);
-            let pred = Value::String(String::from(a.unwrap()));
-            let mut dargs = Vec::new();
-            for darg in args {
-                dargs.push(translate_darg(darg));
-            }
-
-            let mut v = vec![operator, pred];
-            v.extend(dargs);
-            Value::Array(v)
+            let pred = Value::String(String::from(pred.get(0..).unwrap()));
+            let mut operands = vec![pred];
+            operands.extend(args.iter().map(|darg| translate_darg(darg)));
+            ofn_list("BuiltInAtom", operands)
         }
         Atom::ClassAtom { pred, arg } => {
-            let operator = Value::String(String::from("ClassAtom"));
             let expression = translate_class_expression(pred);
             let arg = translate_iarg(arg);
-
-            let v = vec![operator, expression, arg];
-            Value::Array(v)
+            ofn_list("ClassAtom", vec![expression, arg])
         }
         Atom::DataPropertyAtom { pred, args } => {
-            let operator = Value::String(String::from("DataPropertyAtom"));
             let property = translate_data_property(pred);
             let arg1 = translate_darg(&args.0);
             let arg2 = translate_darg(&args.1);
-
-            let v = vec![operator, property, arg1, arg2];
-            Value::Array(v)
+            ofn_list("DataPropertyAtom", vec![property, arg1, arg2])
         }
         Atom::DataRangeAtom { pred, arg } => {
-            let operator = Value::String(String::from("DataRangeAtom"));
             let range = translate_data_range(pred);
             let arg = translate_darg(arg);
-
-            let v = vec![operator, range, arg];
-            Value::Array(v)
+            ofn_list("DataRangeAtom", vec![range, arg])
         }
         Atom::DifferentIndividualsAtom(arg1, arg2) => {
-            let operator = Value::String(String::from("DifferentIndividualsAtom"));
-            let v = vec![operator, translate_iarg(arg1), translate_iarg(arg2)];
-            Value::Array(v)
+            ofn_list("DifferentIndividualsAtom", vec![translate_iarg(arg1), translate_iarg(arg2)])
         }
         Atom::ObjectPropertyAtom { pred, args } => {
-            let operator = Value::String(String::from("ObjectPropertyAtom"));
             let property = translate_object_property_expression(pred);
             let arg1 = translate_iarg(&args.0);
             let arg2 = translate_iarg(&args.1);
-
-            let v = vec![operator, property, arg1, arg2];
-            Value::Array(v)
+            ofn_list("ObjectPropertyAtom", vec![property, arg1, arg2])
         }
         Atom::SameIndividualAtom(arg1, arg2) => {
-            let operator = Value::String(String::from("SameIndividualAtom"));
-            let v = vec![operator, translate_iarg(arg1), translate_iarg(arg2)];
-            Value::Array(v)
+            ofn_list("SameIndividualAtom", vec![translate_iarg(arg1), translate_iarg(arg2)])
         }
     }
 }
 
 pub fn translate_iarg(iarg: &IArgument<ArcStr>) -> Value {
     match iarg {
-        IArgument::Variable(x) => {
-            let operator = Value::String(String::from("Variable"));
-            let v = vec![operator, Value::String(String::from(x))];
-            Value::Array(v)
-        }
+        IArgument::Variable(x) => ofn_list("Variable", vec![Value::String(String::from(x))]),
         IArgument::Individual(x) => translate_individual(x),
     }
 }
 
 pub fn translate_darg(darg: &DArgument<ArcStr>) -> Value {
     match darg {
-        DArgument::Variable(x) => {
-            let operator = Value::String(String::from("Variable"));
-            let v = vec![operator, Value::String(String::from(x))];
-            Value::Array(v)
-        }
+        DArgument::Variable(x) => ofn_list("Variable", vec![Value::String(String::from(x))]),
         DArgument::Literal(x) => translate_literal(x),
     }
 }

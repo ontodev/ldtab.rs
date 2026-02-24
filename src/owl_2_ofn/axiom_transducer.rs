@@ -1,6 +1,6 @@
 use crate::owl_2_ofn::annotation_transducer;
 use crate::owl_2_ofn::expression_transducer;
-use crate::owl_2_ofn::util::format_iri;
+use crate::owl_2_ofn::util::{format_iri, ofn_list};
 use horned_owl::model::{
     AnnotationAssertion, AnnotationPropertyDomain, AnnotationPropertyRange,
     AsymmetricObjectProperty, ClassAssertion, Component, DataPropertyAssertion, DataPropertyDomain,
@@ -96,60 +96,43 @@ pub fn translate(axiom: &Component<ArcStr>) -> Value {
 }
 
 pub fn translate_subclass_of(axiom: &SubClassOf<ArcStr>) -> Value {
-    let operator = Value::String(String::from("SubClassOf"));
     let subclass = expression_transducer::translate_class_expression(&axiom.sub);
     let superclass = expression_transducer::translate_class_expression(&axiom.sup);
-    let v = vec![operator, subclass, superclass];
-    Value::Array(v)
+    ofn_list("SubClassOf", vec![subclass, superclass])
 }
 
 pub fn translate_disjoint_union(axiom: &DisjointUnion<ArcStr>) -> Value {
-    let operator = Value::String(String::from("DisjointUnion"));
-    let lhs = axiom.0.clone();
-    let lhs = expression_transducer::translate_class(&lhs);
-    let arguments = axiom.1.clone();
-    let mut operands: Vec<Value> = arguments
+    let lhs = expression_transducer::translate_class(&axiom.0.clone());
+    let mut operands: Vec<Value> = axiom.1.clone()
         .into_iter()
         .map(|x| expression_transducer::translate_class_expression(&x))
         .collect();
-
     operands.insert(0, lhs);
-    operands.insert(0, operator);
-    Value::Array(operands)
+    ofn_list("DisjointUnion", operands)
 }
 
 pub fn translate_disjoint_classes(axiom: &DisjointClasses<ArcStr>) -> Value {
-    let operator = Value::String(String::from("DisjointClasses"));
-    let classes = axiom.0.clone();
-    let mut operands: Vec<Value> = classes
+    let operands: Vec<Value> = axiom.0.clone()
         .into_iter()
         .map(|x| expression_transducer::translate_class_expression(&x))
         .collect();
-    operands.insert(0, operator);
-    Value::Array(operands)
+    ofn_list("DisjointClasses", operands)
 }
 
 pub fn translate_equivalent_classes(axiom: &EquivalentClasses<ArcStr>) -> Value {
-    let operator = Value::String(String::from("EquivalentClasses"));
-    let classes = axiom.0.clone();
-    let mut operands: Vec<Value> = classes
+    let operands: Vec<Value> = axiom.0.clone()
         .into_iter()
         .map(|x| expression_transducer::translate_class_expression(&x))
         .collect();
-    operands.insert(0, operator);
-    Value::Array(operands)
+    ofn_list("EquivalentClasses", operands)
 }
 
 pub fn translate_object_property_axiom(
     operator: &str,
     property: &ObjectPropertyExpression<ArcStr>,
 ) -> Value {
-    let operator = Value::String(String::from(operator));
     let argument = expression_transducer::translate_object_property_expression(property);
-
-    let mut res = vec![operator];
-    res.push(argument);
-    Value::Array(res)
+    ofn_list(operator, vec![argument])
 }
 
 pub fn translate_reflexive_object_property(axiom: &ReflexiveObjectProperty<ArcStr>) -> Value {
@@ -183,195 +166,122 @@ pub fn translate_inverse_functional_object_property(
 }
 
 pub fn translate_object_property_domain(axiom: &ObjectPropertyDomain<ArcStr>) -> Value {
-    let property = expression_transducer::translate_object_property_expression(&axiom.ope.clone());
-    let domain = expression_transducer::translate_class_expression(&axiom.ce.clone());
-
-    let operator = Value::String(String::from("ObjectPropertyDomain"));
-
-    let mut res = vec![operator];
-    res.push(property);
-    res.push(domain);
-    Value::Array(res)
+    let property = expression_transducer::translate_object_property_expression(&axiom.ope);
+    let domain = expression_transducer::translate_class_expression(&axiom.ce);
+    ofn_list("ObjectPropertyDomain", vec![property, domain])
 }
 
 pub fn translate_object_property_range(axiom: &ObjectPropertyRange<ArcStr>) -> Value {
-    let operator = Value::String(String::from("ObjectPropertyRange"));
-    let property = expression_transducer::translate_object_property_expression(&axiom.ope.clone());
-    let domain = expression_transducer::translate_class_expression(&axiom.ce.clone());
-
-    let mut res = vec![operator];
-    res.push(property);
-    res.push(domain);
-    Value::Array(res)
+    let property = expression_transducer::translate_object_property_expression(&axiom.ope);
+    let range = expression_transducer::translate_class_expression(&axiom.ce);
+    ofn_list("ObjectPropertyRange", vec![property, range])
 }
 
 pub fn translate_inverse_properties(axiom: &InverseObjectProperties<ArcStr>) -> Value {
-    let operator = Value::String(String::from("InverseObjectProperties"));
-    let lhs = expression_transducer::translate_object_property(&axiom.0.clone());
-    let rhs = expression_transducer::translate_object_property(&axiom.1.clone());
-
-    let mut res = vec![operator];
-    res.push(lhs);
-    res.push(rhs);
-    Value::Array(res)
+    let lhs = expression_transducer::translate_object_property(&axiom.0);
+    let rhs = expression_transducer::translate_object_property(&axiom.1);
+    ofn_list("InverseObjectProperties", vec![lhs, rhs])
 }
 
 pub fn translate_disjoint_object_properties(axiom: &DisjointObjectProperties<ArcStr>) -> Value {
-    let operator = Value::String(String::from("DisjointObjectProperties"));
-
-    let arguments = axiom.0.clone();
-    let mut operands: Vec<Value> = arguments
+    let operands: Vec<Value> = axiom.0.clone()
         .into_iter()
         .map(|x| expression_transducer::translate_object_property_expression(&x))
         .collect();
-    operands.insert(0, operator);
-    Value::Array(operands)
+    ofn_list("DisjointObjectProperties", operands)
 }
 
 pub fn translate_equivalent_object_properties(axiom: &EquivalentObjectProperties<ArcStr>) -> Value {
-    let operator = Value::String(String::from("EquivalentObjectProperties"));
-
-    let arguments = axiom.0.clone();
-    let mut operands: Vec<Value> = arguments
+    let operands: Vec<Value> = axiom.0.clone()
         .into_iter()
         .map(|x| expression_transducer::translate_object_property_expression(&x))
         .collect();
-    operands.insert(0, operator);
-    Value::Array(operands)
+    ofn_list("EquivalentObjectProperties", operands)
 }
 
 pub fn translate_sub_object_property(axiom: &SubObjectPropertyOf<ArcStr>) -> Value {
-    let operator = Value::String(String::from("SubObjectPropertyOf"));
     let lhs = expression_transducer::translate_sub_object_property_expression(&axiom.sub);
-
     let rhs = expression_transducer::translate_object_property_expression(&axiom.sup);
-
-    let v = vec![operator, lhs, rhs];
-    Value::Array(v)
+    ofn_list("SubObjectPropertyOf", vec![lhs, rhs])
 }
 
 pub fn wrap_declaration(v: &Value) -> Value {
-    let declaration = Value::String(String::from("Declaration"));
-    let res = vec![declaration, v.clone()];
-    Value::Array(res)
+    ofn_list("Declaration", vec![v.clone()])
 }
 
 pub fn translate_class_declaration(axiom: &DeclareClass<ArcStr>) -> Value {
-    let operator = Value::String(String::from("Class"));
     let class = expression_transducer::translate_class(&axiom.0.clone());
-
-    let v = vec![operator, class];
-    let v = Value::Array(v);
-    wrap_declaration(&v)
+    wrap_declaration(&ofn_list("Class", vec![class]))
 }
 
 pub fn translate_object_property_declaration(axiom: &DeclareObjectProperty<ArcStr>) -> Value {
-    let operator = Value::String(String::from("ObjectProperty"));
     let property = expression_transducer::translate_object_property(&axiom.0.clone());
-
-    let v = vec![operator, property];
-    let v = Value::Array(v);
-    wrap_declaration(&v)
+    wrap_declaration(&ofn_list("ObjectProperty", vec![property]))
 }
 
 pub fn translate_data_property_declaration(axiom: &DeclareDataProperty<ArcStr>) -> Value {
-    let operator = Value::String(String::from("DataProperty"));
     let property = expression_transducer::translate_data_property(&axiom.0.clone());
-
-    let v = vec![operator, property];
-    let v = Value::Array(v);
-    wrap_declaration(&v)
+    wrap_declaration(&ofn_list("DataProperty", vec![property]))
 }
 
 pub fn translate_named_individual_declaration(axiom: &DeclareNamedIndividual<ArcStr>) -> Value {
-    let operator = Value::String(String::from("NamedIndividual"));
-    let property = expression_transducer::translate_named_individual(&axiom.0.clone());
-
-    let v = vec![operator, property];
-    let v = Value::Array(v);
-    wrap_declaration(&v)
+    let individual = expression_transducer::translate_named_individual(&axiom.0.clone());
+    wrap_declaration(&ofn_list("NamedIndividual", vec![individual]))
 }
 
 pub fn translate_datatype_declaration(axiom: &DeclareDatatype<ArcStr>) -> Value {
-    let operator = Value::String(String::from("Datatype"));
-    let property = expression_transducer::translate_datatype(&axiom.0.clone());
-
-    let v = vec![operator, property];
-    let v = Value::Array(v);
-    wrap_declaration(&v)
+    let datatype = expression_transducer::translate_datatype(&axiom.0.clone());
+    wrap_declaration(&ofn_list("Datatype", vec![datatype]))
 }
 
 pub fn translate_import(axiom: &Import<ArcStr>) -> Value {
-    let operator = Value::String(String::from("Import"));
     let a = json!(axiom.0.get(0..));
-    let v = vec![operator, a];
-    Value::Array(v)
+    ofn_list("Import", vec![a])
 }
 
 pub fn translate_sub_data_property_of(axiom: &SubDataPropertyOf<ArcStr>) -> Value {
-    let operator = Value::String(String::from("SubDataPropertyOf"));
     let sub = expression_transducer::translate_data_property(&axiom.sub);
     let sup = expression_transducer::translate_data_property(&axiom.sup);
-
-    let v = vec![operator, sub, sup];
-    Value::Array(v)
+    ofn_list("SubDataPropertyOf", vec![sub, sup])
 }
 
 pub fn translate_equivalent_data_properties(axiom: &EquivalentDataProperties<ArcStr>) -> Value {
-    let operator = Value::String(String::from("EquivalentDataProperties"));
-    let arguments = axiom.0.clone();
-    let mut operands: Vec<Value> = arguments
+    let operands: Vec<Value> = axiom.0.clone()
         .into_iter()
         .map(|x| expression_transducer::translate_data_property(&x))
         .collect();
-    operands.insert(0, operator);
-    Value::Array(operands)
+    ofn_list("EquivalentDataProperties", operands)
 }
 
 pub fn translate_disjoint_data_properties(axiom: &DisjointDataProperties<ArcStr>) -> Value {
-    let operator = Value::String(String::from("DisjointDataProperties"));
-    let arguments = axiom.0.clone();
-    let mut operands: Vec<Value> = arguments
+    let operands: Vec<Value> = axiom.0.clone()
         .into_iter()
         .map(|x| expression_transducer::translate_data_property(&x))
         .collect();
-    operands.insert(0, operator);
-    Value::Array(operands)
+    ofn_list("DisjointDataProperties", operands)
 }
 
 pub fn translate_data_property_domain(axiom: &DataPropertyDomain<ArcStr>) -> Value {
-    let operator = Value::String(String::from("DataPropertyDomain"));
     let property = expression_transducer::translate_data_property(&axiom.dp);
     let domain = expression_transducer::translate_class_expression(&axiom.ce);
-
-    let v = vec![operator, property, domain];
-    Value::Array(v)
+    ofn_list("DataPropertyDomain", vec![property, domain])
 }
 
 pub fn translate_data_property_range(axiom: &DataPropertyRange<ArcStr>) -> Value {
-    let operator = Value::String(String::from("DataPropertyRange"));
     let property = expression_transducer::translate_data_property(&axiom.dp);
     let range = expression_transducer::translate_data_range(&axiom.dr);
-
-    let v = vec![operator, property, range];
-    Value::Array(v)
+    ofn_list("DataPropertyRange", vec![property, range])
 }
 
 pub fn translate_functional_data_property(axiom: &FunctionalDataProperty<ArcStr>) -> Value {
-    let operator = Value::String(String::from("FunctionalDataProperty"));
     let property = expression_transducer::translate_data_property(&axiom.0);
-
-    let v = vec![operator, property];
-    Value::Array(v)
+    ofn_list("FunctionalDataProperty", vec![property])
 }
 
 pub fn translate_datatype_definition(axiom: &DatatypeDefinition<ArcStr>) -> Value {
-    let operator = Value::String(String::from("DatatypeDefinition"));
     let datatype = expression_transducer::translate_datatype(&axiom.kind);
     let range = expression_transducer::translate_data_range(&axiom.range);
-
-    let v = vec![operator, datatype, range];
-    Value::Array(v)
+    ofn_list("DatatypeDefinition", vec![datatype, range])
 }
 
 pub fn translate_has_key(axiom: &HasKey<ArcStr>) -> Value {
@@ -398,135 +308,97 @@ pub fn translate_has_key(axiom: &HasKey<ArcStr>) -> Value {
 }
 
 pub fn translate_same_individual(axiom: &SameIndividual<ArcStr>) -> Value {
-    let operator = Value::String(String::from("SameIndividual"));
-    let individuals = axiom.0.clone();
-    let mut operands: Vec<Value> = individuals
+    let operands: Vec<Value> = axiom.0.clone()
         .into_iter()
         .map(|x| expression_transducer::translate_individual(&x))
         .collect();
-    operands.insert(0, operator);
-    Value::Array(operands)
+    ofn_list("SameIndividual", operands)
 }
 
 pub fn translate_different_individuals(axiom: &DifferentIndividuals<ArcStr>) -> Value {
-    let operator = Value::String(String::from("DifferentIndividuals"));
-    let individuals = axiom.0.clone();
-    let mut operands: Vec<Value> = individuals
+    let operands: Vec<Value> = axiom.0.clone()
         .into_iter()
         .map(|x| expression_transducer::translate_individual(&x))
         .collect();
-    operands.insert(0, operator);
-    Value::Array(operands)
+    ofn_list("DifferentIndividuals", operands)
 }
 
 pub fn translate_class_assertion(axiom: &ClassAssertion<ArcStr>) -> Value {
-    let operator = Value::String(String::from("ClassAssertion"));
     let individual = expression_transducer::translate_individual(&axiom.i);
     let class = expression_transducer::translate_class_expression(&axiom.ce);
-
-    let v = vec![operator, class, individual];
-    Value::Array(v)
+    ofn_list("ClassAssertion", vec![class, individual])
 }
 
 pub fn translate_object_property_assertion(axiom: &ObjectPropertyAssertion<ArcStr>) -> Value {
-    let operator = Value::String(String::from("ObjectPropertyAssertion"));
     let from = expression_transducer::translate_individual(&axiom.from);
     let to = expression_transducer::translate_individual(&axiom.to);
     let property = expression_transducer::translate_object_property_expression(&axiom.ope);
-
-    let v = vec![operator, property, from, to];
-    Value::Array(v)
+    ofn_list("ObjectPropertyAssertion", vec![property, from, to])
 }
 
 pub fn translate_negative_object_property_assertion(
     axiom: &NegativeObjectPropertyAssertion<ArcStr>,
 ) -> Value {
-    let operator = Value::String(String::from("NegativeObjectPropertyAssertion"));
     let from = expression_transducer::translate_individual(&axiom.from);
     let to = expression_transducer::translate_individual(&axiom.to);
     let property = expression_transducer::translate_object_property_expression(&axiom.ope);
-
-    let v = vec![operator, property, from, to];
-    Value::Array(v)
+    ofn_list("NegativeObjectPropertyAssertion", vec![property, from, to])
 }
 
 pub fn translate_data_property_assertion(axiom: &DataPropertyAssertion<ArcStr>) -> Value {
-    let operator = Value::String(String::from("DataPropertyAssertion"));
     let from = expression_transducer::translate_individual(&axiom.from);
     let to = expression_transducer::translate_literal(&axiom.to);
     let property = expression_transducer::translate_data_property(&axiom.dp);
-
-    let v = vec![operator, property, from, to];
-    Value::Array(v)
+    ofn_list("DataPropertyAssertion", vec![property, from, to])
 }
 
 pub fn translate_negative_data_property_assertion(
     axiom: &NegativeDataPropertyAssertion<ArcStr>,
 ) -> Value {
-    let operator = Value::String(String::from("NegativeDataPropertyAssertion"));
     let from = expression_transducer::translate_individual(&axiom.from);
     let to = expression_transducer::translate_literal(&axiom.to);
     let property = expression_transducer::translate_data_property(&axiom.dp);
-
-    let v = vec![operator, property, from, to];
-    Value::Array(v)
+    ofn_list("NegativeDataPropertyAssertion", vec![property, from, to])
 }
 
 pub fn translate_annotation_assertion(axiom: &AnnotationAssertion<ArcStr>) -> Value {
-
-    let operator = Value::String(String::from("AnnotationAssertion"));
     let subject = annotation_transducer::translate_annotation_subject(&axiom.subject);
     let property = annotation_transducer::translate_annotation_property(&axiom.ann.ap);
     let value = annotation_transducer::translate_annotation_value(&axiom.ann.av);
-
-    let v = vec![operator, property, subject, value];
-    Value::Array(v)
+    ofn_list("AnnotationAssertion", vec![property, subject, value])
 }
 
 pub fn translate_ontology_annotation(axiom: &OntologyAnnotation<ArcStr>) -> Value {
-    let operator = Value::String(String::from("OntologyAnnotation"));
     let annotation = annotation_transducer::translate_annotation(&axiom.0);
-    let v = vec![operator, annotation];
-    Value::Array(v)
+    ofn_list("OntologyAnnotation", vec![annotation])
 }
 
 pub fn translate_declare_annotation_property(axiom: &DeclareAnnotationProperty<ArcStr>) -> Value {
-    let operator = Value::String(String::from("AnnotationProperty"));
     let annotation = annotation_transducer::translate_annotation_property(&axiom.0);
-    let v = vec![operator, annotation];
-    let v = Value::Array(v);
-    wrap_declaration(&v)
+    wrap_declaration(&ofn_list("AnnotationProperty", vec![annotation]))
 }
 
 pub fn translate_sub_annotation_property_of(axiom: &SubAnnotationPropertyOf<ArcStr>) -> Value {
-    let operator = Value::String(String::from("SubAnnotationPropertyOf"));
     let sub = annotation_transducer::translate_annotation_property(&axiom.sub);
     let sup = annotation_transducer::translate_annotation_property(&axiom.sup);
-    let v = vec![operator, sub, sup];
-    Value::Array(v)
+    ofn_list("SubAnnotationPropertyOf", vec![sub, sup])
 }
 
 pub fn translate_annotation_property_domain(axiom: &AnnotationPropertyDomain<ArcStr>) -> Value {
-    let operator = Value::String(String::from("AnnotationPropertyDomain"));
     let property = annotation_transducer::translate_annotation_property(&axiom.ap);
     let iri = format_iri(axiom.iri.get(0..).unwrap());
-    let v = vec![operator, property, iri];
-    Value::Array(v)
+    ofn_list("AnnotationPropertyDomain", vec![property, iri])
 }
 
 pub fn translate_annotation_property_range(axiom: &AnnotationPropertyRange<ArcStr>) -> Value {
-    let operator = Value::String(String::from("AnnotationPropertyRange"));
     let property = annotation_transducer::translate_annotation_property(&axiom.ap);
     let iri = format_iri(axiom.iri.get(0..).unwrap());
-    let v = vec![operator, property, iri];
-    Value::Array(v)
+    ofn_list("AnnotationPropertyRange", vec![property, iri])
 }
 
 pub fn translate_doc_iri(axiom: &DocIRI<ArcStr>) -> Value {
-    let operator = Value::String(String::from("DocIRI")); // this is not specified in OWL
     let iri = format_iri(axiom.0.get(0..).unwrap());
-    let v = vec![operator, iri];
-    Value::Array(v)
+    ofn_list("DocIRI", vec![iri])
 }
 
 pub fn translate_rule(axiom: &Rule<ArcStr>) -> Value {
@@ -551,12 +423,8 @@ pub fn translate_rule(axiom: &Rule<ArcStr>) -> Value {
 }
 
 pub fn translate_ontology_id(axiom: &OntologyID<ArcStr>) -> Value {
-    let operator = Value::String(String::from("Ontology"));
     let i = axiom.iri.clone().unwrap();
     let iri = format_iri(i.get(0..).unwrap());
-
     let viri = format_iri(axiom.viri.as_deref().unwrap_or("unknown"));
-
-    let v = vec![operator, iri, viri];
-    Value::Array(v)
+    ofn_list("Ontology", vec![iri, viri])
 }

@@ -1,5 +1,5 @@
 use crate::owl_2_ofn::expression_transducer;
-use crate::owl_2_ofn::util::format_iri;
+use crate::owl_2_ofn::util::{format_iri, ofn_list};
 use horned_owl::model::{
     Annotation, AnnotationProperty, AnnotationSubject, AnnotationValue, ArcStr,
 };
@@ -7,11 +7,9 @@ use serde_json::Value;
 use std::collections::BTreeSet;
 
 pub fn translate_annotation(annotation: &Annotation<ArcStr>) -> Value {
-    let operator = Value::String(String::from("Annotation"));
     let property = translate_annotation_property(&annotation.ap);
     let value = translate_annotation_value(&annotation.av);
-    let res = vec![operator, property, value];
-    Value::Array(res)
+    ofn_list("Annotation", vec![property, value])
 }
 
 pub fn translate_annotation_subject(annotation_subject: &AnnotationSubject<ArcStr>) -> Value {
