@@ -1,8 +1,6 @@
 use anyhow::{Context, Result};
 use clap::ArgMatches;
 use std::collections::HashSet;
-use horned_bin::parse_path;
-use horned_owl::io::ParserConfiguration;
 use horned_owl::io::owx::reader::*;
 use horned_owl::model::*;
 use horned_owl::ontology::set::SetOntology;
@@ -10,14 +8,11 @@ use rayon::prelude::*;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde_json::json;
-use serde_json::{Value, Map, from_str};
+use serde_json::{Value, Map};
 use sqlx::{sqlite::SqlitePoolOptions, QueryBuilder, Row, SqlitePool};
 use std::collections::HashMap;
-use std::path::Path;
-use std::io::{BufReader, Result as IoResult};
+use std::io::{BufReader};
 use std::fs::File;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use sha2::{Sha256, Digest};
 
 use std::time::Instant;
@@ -49,8 +44,8 @@ const DATATYPE_JSONLIST: &str = "_JSONLIST";
 const DEFAULT_GRAPH: &str = "graph";
 const UNKNOWN_VALUE: &str = "<unknown>";
 const ASSERTION_TRUE: &str = "1";
-const ASSERTION_FALSE: &str = "0";
-const RETRACTION_TRUE: &str = "1";
+const _ASSERTION_FALSE: &str = "0";
+const _RETRACTION_TRUE: &str = "1";
 const RETRACTION_FALSE: &str = "0";
 
 /// Regex to match typed literals
@@ -140,7 +135,7 @@ pub async fn import(sub_matches: &ArgMatches) -> Result<()> {
     let build = Build::<ArcStr>::new();
 
      match read_with_build(reader, &build) {
-        Ok((ontology, prefix_mapping)) => {
+        Ok((ontology, _prefix_mapping)) => {
             // Use `ontology` and `prefix_mapping` as needed
             let pool = SqlitePoolOptions::new()
                 .max_connections(5)
