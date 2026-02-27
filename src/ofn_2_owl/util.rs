@@ -1,5 +1,9 @@
+use once_cell::sync::Lazy;
 use regex::Regex;
 use serde_json::Value;
+
+static ANONYMOUS_RE: Lazy<Regex> = Lazy::new(|| Regex::new("^(.*)_:(.+)$").unwrap());
+static LITERAL_RE: Lazy<Regex> = Lazy::new(|| Regex::new("(?s)^\"(.*)\"(.*)$").unwrap());
 
 pub fn is_literal(v: &Value) -> bool {
     match v {
@@ -16,14 +20,9 @@ pub fn is_anonynous_individual(v: &Value) -> bool {
 }
 
 pub fn is_anonymous_individual(s: &str) -> bool {
-    let anonymous = Regex::new("^(.*)_:(.+)$").unwrap();
-    anonymous.is_match(s)
+    ANONYMOUS_RE.is_match(s)
 }
 
 pub fn is_literal_string(s: &str) -> bool {
-    //NB: "(?s)" sets a flag so that . matches \n
-    //let literal = Regex::new("^\"(.*)\"(.*)$").unwrap();
-    let literal = Regex::new("(?s)^\"(.*)\"(.*)$").unwrap();
-
-    literal.is_match(s)
+    LITERAL_RE.is_match(s)
 }

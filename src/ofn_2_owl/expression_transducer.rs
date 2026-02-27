@@ -1,3 +1,4 @@
+use once_cell::sync::Lazy;
 use regex::Regex;
 use serde_json::Value;
 use std::rc::Rc;
@@ -6,6 +7,10 @@ use horned_owl::model::{
     AnonymousIndividual, Build, ClassExpression, DataProperty, DataRange, Datatype, Individual,
     Literal, ObjectPropertyExpression, RcStr, SubObjectPropertyExpression,
 };
+
+static SIMPLE_LITERAL_RE: Lazy<Regex> = Lazy::new(|| Regex::new("(?s)^\"(.*)\"$").unwrap());
+static LANGUAGE_TAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new("(?s)^\"(.*)\"@(.*)$").unwrap());
+static DATATYPE_RE: Lazy<Regex> = Lazy::new(|| Regex::new("^(?s)\"(.*)\"\\^\\^(.*)$").unwrap());
 
 pub fn translate_object_property_expression(v: &Value) -> ObjectPropertyExpression<RcStr> {
     match v[0].as_str() {
@@ -88,28 +93,24 @@ pub fn translate_class_expression(v: &Value) -> ClassExpression<RcStr> {
 pub fn translate_literal_string(s: &str) -> Literal<RcStr> {
     let b = Build::new();
 
-    let simple = Regex::new("(?s)^\"(.*)\"$").unwrap();
-    let language_tag = Regex::new("(?s)^\"(.*)\"@(.*)$").unwrap();
-    let datatype = Regex::new("^(?s)\"(.*)\"\\^\\^(.*)$").unwrap();
-
-    if language_tag.is_match(s) {
-        match language_tag.captures(s) {
+    if LANGUAGE_TAG_RE.is_match(s) {
+        match LANGUAGE_TAG_RE.captures(s) {
             Some(x) => Literal::Language {
                 literal: String::from(&x[1]),
                 lang: String::from(&x[2]),
             },
             None => panic!("Not a literal with a language tag"),
         }
-    } else if datatype.is_match(s) {
-        match datatype.captures(s) {
+    } else if DATATYPE_RE.is_match(s) {
+        match DATATYPE_RE.captures(s) {
             Some(x) => Literal::Datatype {
                 literal: String::from(&x[1]),
                 datatype_iri: b.iri(&x[2]),
             },
             None => panic!("Not a literal with a datatype"),
         }
-    } else if simple.is_match(s) {
-        match simple.captures(s) {
+    } else if SIMPLE_LITERAL_RE.is_match(s) {
+        match SIMPLE_LITERAL_RE.captures(s) {
             Some(x) => Literal::Simple {
                 literal: String::from(&x[1]),
             },
