@@ -1,5 +1,6 @@
 use crate::ofn_2_owl::annotation_transducer;
 use crate::ofn_2_owl::expression_transducer;
+use crate::ofn_2_owl::util::extract_iri_str;
 use horned_owl::model::{
     Annotation, AnnotationAssertion, AnnotationProperty, AnnotationPropertyDomain,
     AnnotationPropertyRange, AsymmetricObjectProperty, Build, Class, ClassAssertion,
@@ -74,29 +75,12 @@ pub fn translate_axiom(v: &Value) -> Component<RcStr> {
 
 pub fn translate_named_class(v: &Value) -> Class<RcStr> {
     let b = Build::new();
-
-    let iri = match v {
-        Value::String(x) => x,
-        _ => panic!("Not a named entity"),
-    };
-    b.class(iri.clone()).into()
+    b.class(extract_iri_str(v)).into()
 }
 
 pub fn translate_import(v: &Value) -> Component<RcStr> {
     let b = Build::new();
-
-    let _ontology_iri = match v[1].clone() {
-        Value::String(x) => x,
-        _ => panic!("Not a named entity"),
-    };
-
-    let import_iri = match v[2].clone() {
-        Value::String(x) => x,
-        _ => panic!("Not a named entity"),
-    };
-
-    //let ont = b.iri(ontology_iri).into();
-    let import = b.iri(import_iri).into();
+    let import = b.iri(extract_iri_str(&v[2])).into();
 
     let axiom = Import(import);
     Component::Import(axiom)
@@ -104,32 +88,17 @@ pub fn translate_import(v: &Value) -> Component<RcStr> {
 
 pub fn translate_object_property(v: &Value) -> ObjectProperty<RcStr> {
     let b = Build::new();
-
-    let iri = match v {
-        Value::String(x) => x,
-        _ => panic!("Not a named entity"),
-    };
-    b.object_property(iri.clone()).into()
+    b.object_property(extract_iri_str(v)).into()
 }
 
 pub fn translate_annotation_property(v: &Value) -> AnnotationProperty<RcStr> {
     let b = Build::new();
-
-    let iri = match v {
-        Value::String(x) => x,
-        _ => panic!("Not a named entity"),
-    };
-    b.annotation_property(iri.clone()).into()
+    b.annotation_property(extract_iri_str(v)).into()
 }
 
 pub fn translate_named_individual(v: &Value) -> NamedIndividual<RcStr> {
     let b = Build::new();
-
-    let iri = match v {
-        Value::String(x) => x,
-        _ => panic!("Not a named entity"),
-    };
-    b.named_individual(iri.clone()).into()
+    b.named_individual(extract_iri_str(v)).into()
 }
 
 //TODO refactor this into expression_transducer
@@ -509,8 +478,7 @@ pub fn translate_annotation_property_domain(v: &Value) -> Component<RcStr> {
     let property = annotation_transducer::translate_annotation_property(&v[1]);
 
     let b = Build::new();
-    let string = v[2].as_str().unwrap();
-    let iri = b.iri(string);
+    let iri = b.iri(extract_iri_str(&v[2]));
 
     let axiom = AnnotationPropertyDomain {
         ap: property,
@@ -523,8 +491,7 @@ pub fn translate_annotation_property_range(v: &Value) -> Component<RcStr> {
     let property = annotation_transducer::translate_annotation_property(&v[1]);
 
     let b = Build::new();
-    let string = v[2].as_str().unwrap();
-    let iri = b.iri(string);
+    let iri = b.iri(extract_iri_str(&v[2]));
 
     let axiom = AnnotationPropertyRange {
         ap: property,

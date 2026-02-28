@@ -3,6 +3,7 @@ use regex::Regex;
 use serde_json::Value;
 use std::rc::Rc;
 //use std::sync::Arc;
+use crate::ofn_2_owl::util::extract_iri_str;
 use horned_owl::model::{
     AnonymousIndividual, Build, ClassExpression, DataProperty, DataRange, Datatype, Individual,
     Literal, ObjectPropertyExpression, RcStr, SubObjectPropertyExpression,
@@ -182,96 +183,44 @@ pub fn translate_data_union_of(v: &Value) -> DataRange<RcStr> {
 
 pub fn translate_datatype(v: &Value) -> Datatype<RcStr> {
     let b = Build::new();
-
-    let iri = match v {
-        Value::String(x) => x,
-        _ => panic!("Not a named entity"),
-    };
-    b.datatype(iri.clone()).into()
+    b.datatype(extract_iri_str(v)).into()
 }
 
 pub fn translate_datatype_as_range(v: &Value) -> DataRange<RcStr> {
     let b = Build::new();
-
-    let iri = match v {
-        Value::String(x) => x,
-        _ => panic!("Not a named entity"),
-    };
-
-    DataRange::Datatype(b.datatype(iri.clone()))
+    DataRange::Datatype(b.datatype(extract_iri_str(v)))
 }
 
 pub fn translate_named_object_property(v: &Value) -> ObjectPropertyExpression<RcStr> {
     let b = Build::new();
-
-    let iri = match v {
-        Value::String(x) => x,
-        _ => panic!("Not a named entity"),
-    };
-
-    b.object_property(iri.clone()).into()
+    b.object_property(extract_iri_str(v)).into()
 }
 
 pub fn translate_data_property(v: &Value) -> DataProperty<RcStr> {
     let b = Build::new();
-
-    let iri = match v {
-        Value::String(x) => x,
-        _ => panic!("Not a named entity"),
-    };
-
-    b.data_property(iri.clone()).into()
+    b.data_property(extract_iri_str(v)).into()
 }
 
 pub fn translate_inverse_of(v: &Value) -> ObjectPropertyExpression<RcStr> {
     let b = Build::new();
-
-    let ofn_argument = v[1].clone();
-    let iri = match ofn_argument {
-        Value::String(x) => x,
-        _ => panic!("Not a named entity"),
-    };
-
-    let argument = b.object_property(iri).into();
+    let argument = b.object_property(extract_iri_str(&v[1])).into();
     ObjectPropertyExpression::InverseObjectProperty { 0: argument }
 }
 
 pub fn translate_named_class(v: &Value) -> ClassExpression<RcStr> {
     let b = Build::new();
-
-    let iri = match v {
-        Value::String(x) => x,
-        _ => panic!("Not a named entity"),
-    };
-
-    b.class(iri.clone()).into()
+    b.class(extract_iri_str(v)).into()
 }
 
 pub fn translate_anonymous_individual(v: &Value) -> AnonymousIndividual<RcStr> {
-    let name = match v {
-        Value::String(x) => x,
-        _ => panic!("Not a named entity"),
-    };
-
-    let s = name.as_str();
-    let rc: Rc<str> = Rc::from(s);
+    let rc: Rc<str> = Rc::from(extract_iri_str(v));
     AnonymousIndividual { 0: rc }
-
-    //let arc : Arc<str> = Arc::from(s);
-    //AnonymousIndividual{0: arc}
 }
 
 pub fn translate_individual(v: &Value) -> Individual<RcStr> {
     //TODO: handle anonymous individuals
-
     let b = Build::new();
-
-    let iri = match v {
-        Value::String(x) => x,
-        _ => panic!("Not a named entity"),
-    };
-
-    b.named_individual(iri.clone()).into()
+    b.named_individual(extract_iri_str(v)).into()
 }
 
 pub fn translate_object_some_values_from(v: &Value) -> ClassExpression<RcStr> {

@@ -26,3 +26,8 @@ pub fn is_anonymous_individual(s: &str) -> bool {
 pub fn is_literal_string(s: &str) -> bool {
     LITERAL_RE.is_match(s)
 }
+
+//TODO: check that the string is a valid IRI
+pub fn extract_iri_str(v: &Value) -> &str {
+    v.as_str().expect("Expected an IRI string")
+}

@@ -1,5 +1,6 @@
 use crate::ofn_2_owl::expression_transducer;
 use crate::ofn_2_owl::util;
+use crate::ofn_2_owl::util::extract_iri_str;
 use horned_owl::model::{
     Annotation, AnnotationProperty, AnnotationSubject, AnnotationValue, Build, RcStr,
 };
@@ -17,13 +18,7 @@ pub fn translate_annotation(v: &Value) -> Annotation<RcStr> {
 
 pub fn translate_annotation_property(v: &Value) -> AnnotationProperty<RcStr> {
     let b = Build::new();
-
-    let iri = match v {
-        Value::String(x) => x,
-        _ => panic!("Not a named entity"),
-    };
-
-    b.annotation_property(iri.clone())
+    b.annotation_property(extract_iri_str(v))
 }
 
 pub fn translate_annotation_value(v: &Value) -> AnnotationValue<RcStr> {
@@ -32,8 +27,7 @@ pub fn translate_annotation_value(v: &Value) -> AnnotationValue<RcStr> {
         AnnotationValue::Literal(value)
     } else {
         let b = Build::new();
-        let string = v.as_str().unwrap();
-        let iri = b.iri(string);
+        let iri = b.iri(extract_iri_str(v));
         AnnotationValue::IRI(iri)
     }
 }
@@ -44,8 +38,7 @@ pub fn translate_annotation_subject(v: &Value) -> AnnotationSubject<RcStr> {
         AnnotationSubject::AnonymousIndividual(individual)
     } else {
         let b = Build::new();
-        let string = v.as_str().unwrap();
-        let iri = b.iri(string);
+        let iri = b.iri(extract_iri_str(v));
         AnnotationSubject::IRI(iri)
     }
 }
