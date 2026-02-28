@@ -41,13 +41,13 @@ pub fn translate(ofn: &Value) -> AnnotatedComponent<RcStr> {
 
 //TODO: reuse wiring (ofn2ldtab/annotation_translation)
 pub fn get_owl(ofn: &Value) -> Value {
-    let mut res = Vec::new();
-    let original = &ofn.as_array().unwrap()[0..];
-    for element in original {
-        if !is_annotation(element) {
-            res.push(element.clone());
-        }
-    }
+    let res: Vec<Value> = ofn
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| !is_annotation(e))
+        .cloned()
+        .collect();
     Value::Array(res)
 }
 
@@ -61,24 +61,11 @@ pub fn is_annotation(v: &Value) -> bool {
     }
 }
 
-pub fn has_annotation(v: &Value) -> bool {
-    match v {
-        Value::Array(x) => is_annotation(&x[1]),
-        _ => false,
-    }
-}
-
 pub fn get_annotations(ofn: &Value) -> Vec<Value> {
-    if has_annotation(&ofn) {
-        let mut res = Vec::new();
-        let candidates = &ofn.as_array().unwrap()[0..];
-        for candidate in candidates {
-            if is_annotation(candidate) {
-                res.push(candidate.clone());
-            }
-        }
-        res
-    } else {
-        Vec::new() //empty vector
-    }
+    ofn.as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| is_annotation(e))
+        .cloned()
+        .collect()
 }
