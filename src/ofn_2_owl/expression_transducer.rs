@@ -28,9 +28,9 @@ pub fn translate_object_property_expression(v: &Value) -> ObjectPropertyExpressi
 pub fn translate_sub_object_property_expression(v: &Value) -> SubObjectPropertyExpression<RcStr> {
     match v {
         Value::Array(array) => {
-            let operands: Vec<ObjectPropertyExpression<RcStr>> = (&array[1..])
-                .into_iter()
-                .map(|x| translate_object_property_expression(&x))
+            let operands: Vec<ObjectPropertyExpression<RcStr>> = array[1..]
+                .iter()
+                .map(|x| translate_object_property_expression(x))
                 .collect();
             SubObjectPropertyExpression::ObjectPropertyChain(operands)
         }
@@ -134,9 +134,9 @@ pub fn translate_data_range(v: &Value) -> DataRange<RcStr> {
 }
 
 pub fn translate_data_one_of(v: &Value) -> DataRange<RcStr> {
-    let operands: Vec<Literal<RcStr>> = (&(v.as_array().unwrap())[1..])
-        .into_iter()
-        .map(|x| translate_literal(&x))
+    let operands: Vec<Literal<RcStr>> = v.as_array().unwrap()[1..]
+        .iter()
+        .map(|x| translate_literal(x))
         .collect();
     DataRange::DataOneOf(operands)
 }
@@ -148,18 +148,18 @@ pub fn translate_data_complement_of(v: &Value) -> DataRange<RcStr> {
 }
 
 pub fn translate_data_intersection_of(v: &Value) -> DataRange<RcStr> {
-    let operands: Vec<DataRange<RcStr>> = (&(v.as_array().unwrap())[1..])
-        .into_iter()
-        .map(|x| translate_data_range(&x))
+    let operands: Vec<DataRange<RcStr>> = v.as_array().unwrap()[1..]
+        .iter()
+        .map(|x| translate_data_range(x))
         .collect();
 
     DataRange::DataIntersectionOf(operands)
 }
 
 pub fn translate_data_union_of(v: &Value) -> DataRange<RcStr> {
-    let operands: Vec<DataRange<RcStr>> = (&(v.as_array().unwrap())[1..])
-        .into_iter()
-        .map(|x| translate_data_range(&x))
+    let operands: Vec<DataRange<RcStr>> = v.as_array().unwrap()[1..]
+        .iter()
+        .map(|x| translate_data_range(x))
         .collect();
 
     DataRange::DataUnionOf(operands)
@@ -305,27 +305,27 @@ pub fn translate_object_has_self(v: &Value) -> ClassExpression<RcStr> {
 }
 
 pub fn translate_object_intersection_of(v: &Value) -> ClassExpression<RcStr> {
-    let operands: Vec<ClassExpression<RcStr>> = (&(v.as_array().unwrap())[1..])
-        .into_iter()
-        .map(|x| translate_class_expression(&x))
+    let operands: Vec<ClassExpression<RcStr>> = v.as_array().unwrap()[1..]
+        .iter()
+        .map(|x| translate_class_expression(x))
         .collect();
 
     ClassExpression::ObjectIntersectionOf(operands)
 }
 
 pub fn translate_object_union_of(v: &Value) -> ClassExpression<RcStr> {
-    let operands: Vec<ClassExpression<RcStr>> = (&(v.as_array().unwrap())[1..])
-        .into_iter()
-        .map(|x| translate_class_expression(&x))
+    let operands: Vec<ClassExpression<RcStr>> = v.as_array().unwrap()[1..]
+        .iter()
+        .map(|x| translate_class_expression(x))
         .collect();
 
     ClassExpression::ObjectUnionOf(operands)
 }
 
 pub fn translate_object_one_of(v: &Value) -> ClassExpression<RcStr> {
-    let operands: Vec<Individual<RcStr>> = (&(v.as_array().unwrap())[1..])
-        .into_iter()
-        .map(|x| translate_individual(&x))
+    let operands: Vec<Individual<RcStr>> = v.as_array().unwrap()[1..]
+        .iter()
+        .map(|x| translate_individual(x))
         .collect();
 
     ClassExpression::ObjectOneOf(operands)

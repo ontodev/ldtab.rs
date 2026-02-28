@@ -106,18 +106,18 @@ pub fn translate_subclass_of(v: &Value) -> Component<RcStr> {
 }
 
 pub fn translate_equivalent_classes(v: &Value) -> Component<RcStr> {
-    let operands: Vec<ClassExpression<RcStr>> = (&(v.as_array().unwrap())[1..])
-        .into_iter()
-        .map(|x| expression_transducer::translate_class_expression(&x))
+    let operands: Vec<ClassExpression<RcStr>> = v.as_array().unwrap()[1..]
+        .iter()
+        .map(|x| expression_transducer::translate_class_expression(x))
         .collect();
     let axiom = EquivalentClasses { 0: operands };
     Component::EquivalentClasses(axiom)
 }
 
 pub fn translate_disjoint_classes(v: &Value) -> Component<RcStr> {
-    let operands: Vec<ClassExpression<RcStr>> = (&(v.as_array().unwrap())[1..])
-        .into_iter()
-        .map(|x| expression_transducer::translate_class_expression(&x))
+    let operands: Vec<ClassExpression<RcStr>> = v.as_array().unwrap()[1..]
+        .iter()
+        .map(|x| expression_transducer::translate_class_expression(x))
         .collect();
     let axiom = DisjointClasses { 0: operands };
     Component::DisjointClasses(axiom)
@@ -128,9 +128,9 @@ pub fn translate_disjoint_union(v: &Value) -> Component<RcStr> {
     //let lhs = expression_transducer::translate_class_expression(&v[1]);
     let lhs = translate_named_class(&v[1]);
 
-    let operands: Vec<ClassExpression<RcStr>> = (&(v.as_array().unwrap())[2..])
-        .into_iter()
-        .map(|x| expression_transducer::translate_class_expression(&x))
+    let operands: Vec<ClassExpression<RcStr>> = v.as_array().unwrap()[2..]
+        .iter()
+        .map(|x| expression_transducer::translate_class_expression(x))
         .collect();
     let axiom = DisjointUnion {
         0: lhs,
@@ -196,18 +196,18 @@ pub fn translate_sub_object_property_of(v: &Value) -> Component<RcStr> {
 }
 
 pub fn translate_equivalent_object_properties(v: &Value) -> Component<RcStr> {
-    let operands: Vec<ObjectPropertyExpression<RcStr>> = (&(v.as_array().unwrap())[1..])
-        .into_iter()
-        .map(|x| expression_transducer::translate_object_property_expression(&x))
+    let operands: Vec<ObjectPropertyExpression<RcStr>> = v.as_array().unwrap()[1..]
+        .iter()
+        .map(|x| expression_transducer::translate_object_property_expression(x))
         .collect();
     let axiom = EquivalentObjectProperties(operands);
     Component::EquivalentObjectProperties(axiom)
 }
 
 pub fn translate_disjoint_object_properties(v: &Value) -> Component<RcStr> {
-    let operands: Vec<ObjectPropertyExpression<RcStr>> = (&(v.as_array().unwrap())[1..])
-        .into_iter()
-        .map(|x| expression_transducer::translate_object_property_expression(&x))
+    let operands: Vec<ObjectPropertyExpression<RcStr>> = v.as_array().unwrap()[1..]
+        .iter()
+        .map(|x| expression_transducer::translate_object_property_expression(x))
         .collect();
     let axiom = DisjointObjectProperties(operands);
     Component::DisjointObjectProperties(axiom)
@@ -291,18 +291,18 @@ pub fn translate_sub_dataproperty_of(v: &Value) -> Component<RcStr> {
 }
 
 pub fn translate_equivalent_data_properties(v: &Value) -> Component<RcStr> {
-    let operands: Vec<DataProperty<RcStr>> = (&(v.as_array().unwrap())[1..])
-        .into_iter()
-        .map(|x| expression_transducer::translate_data_property(&x))
+    let operands: Vec<DataProperty<RcStr>> = v.as_array().unwrap()[1..]
+        .iter()
+        .map(|x| expression_transducer::translate_data_property(x))
         .collect();
     let axiom = EquivalentDataProperties(operands);
     Component::EquivalentDataProperties(axiom)
 }
 
 pub fn translate_disjoint_data_properties(v: &Value) -> Component<RcStr> {
-    let operands: Vec<DataProperty<RcStr>> = (&(v.as_array().unwrap())[1..])
-        .into_iter()
-        .map(|x| expression_transducer::translate_data_property(&x))
+    let operands: Vec<DataProperty<RcStr>> = v.as_array().unwrap()[1..]
+        .iter()
+        .map(|x| expression_transducer::translate_data_property(x))
         .collect();
     let axiom = DisjointDataProperties(operands);
     Component::DisjointDataProperties(axiom)
@@ -360,9 +360,9 @@ pub fn translate_datatype_definition(v: &Value) -> Component<RcStr> {
 //}
 
 pub fn translate_same_individual(v: &Value) -> Component<RcStr> {
-    let operands: Vec<Individual<RcStr>> = (&(v.as_array().unwrap())[1..])
-        .into_iter()
-        .map(|x| expression_transducer::translate_individual(&x))
+    let operands: Vec<Individual<RcStr>> = v.as_array().unwrap()[1..]
+        .iter()
+        .map(|x| expression_transducer::translate_individual(x))
         .collect();
 
     let axiom = SameIndividual { 0: operands };
@@ -370,9 +370,9 @@ pub fn translate_same_individual(v: &Value) -> Component<RcStr> {
 }
 
 pub fn translate_different_individuals(v: &Value) -> Component<RcStr> {
-    let operands: Vec<Individual<RcStr>> = (&(v.as_array().unwrap())[1..])
-        .into_iter()
-        .map(|x| expression_transducer::translate_individual(&x))
+    let operands: Vec<Individual<RcStr>> = v.as_array().unwrap()[1..]
+        .iter()
+        .map(|x| expression_transducer::translate_individual(x))
         .collect();
 
     let axiom = DifferentIndividuals { 0: operands };
