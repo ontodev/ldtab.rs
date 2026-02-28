@@ -95,33 +95,22 @@ pub fn translate_class_expression(v: &Value) -> ClassExpression<RcStr> {
 }
 
 pub fn translate_literal_string(s: &str) -> Literal<RcStr> {
-    let b = build();
-
-    if LANGUAGE_TAG_RE.is_match(s) {
-        match LANGUAGE_TAG_RE.captures(s) {
-            Some(x) => Literal::Language {
-                literal: String::from(&x[1]),
-                lang: String::from(&x[2]),
-            },
-            None => panic!("Not a literal with a language tag"),
+    if let Some(x) = LANGUAGE_TAG_RE.captures(s) {
+        Literal::Language {
+            literal: String::from(&x[1]),
+            lang: String::from(&x[2]),
         }
-    } else if DATATYPE_RE.is_match(s) {
-        match DATATYPE_RE.captures(s) {
-            Some(x) => Literal::Datatype {
-                literal: String::from(&x[1]),
-                datatype_iri: b.iri(&x[2]),
-            },
-            None => panic!("Not a literal with a datatype"),
+    } else if let Some(x) = DATATYPE_RE.captures(s) {
+        Literal::Datatype {
+            literal: String::from(&x[1]),
+            datatype_iri: build().iri(&x[2]),
         }
-    } else if SIMPLE_LITERAL_RE.is_match(s) {
-        match SIMPLE_LITERAL_RE.captures(s) {
-            Some(x) => Literal::Simple {
-                literal: String::from(&x[1]),
-            },
-            None => panic!("Not a simple literal"),
+    } else if let Some(x) = SIMPLE_LITERAL_RE.captures(s) {
+        Literal::Simple {
+            literal: String::from(&x[1]),
         }
     } else {
-        panic!()
+        panic!("Not a valid literal: {}", s)
     }
 }
 
