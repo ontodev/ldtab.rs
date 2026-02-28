@@ -71,14 +71,6 @@ pub fn translate_class_expression(v: &Value) -> ClassExpression<RcStr> {
         Some("DataMaxCardinality") => translate_data_max_cardinality(v),
         Some("DataExactCardinality") => translate_data_exact_cardinality(v),
 
-        //TODO: deprecate these
-        Some("ObjectMinQualifiedCardinality") => translate_object_min_qualified_cardinality(v),
-        Some("ObjectMaxQualifiedCardinality") => translate_object_max_qualified_cardinality(v),
-        Some("ObjectExactQualifiedCardinality") => translate_object_exact_qualified_cardinality(v),
-        Some("DataMinQualifiedCardinality") => translate_data_min_qualified_cardinality(v),
-        Some("DataMaxQualifiedCardinality") => translate_data_max_qualified_cardinality(v),
-        Some("DataExactQualifiedCardinality") => translate_data_exact_qualified_cardinality(v),
-
         Some("ObjectHasSelf") => translate_object_has_self(v),
         Some("ObjectIntersectionOf") => translate_object_intersection_of(v),
         Some("ObjectUnionOf") => translate_object_union_of(v),
@@ -261,19 +253,6 @@ pub fn translate_object_min_cardinality(v: &Value) -> ClassExpression<RcStr> {
     }
 }
 
-pub fn translate_object_min_qualified_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = parse_string_cardinality(&v[1]);
-
-    let property = translate_object_property_expression(&v[2]);
-    let filler: ClassExpression<RcStr> = translate_class_expression(&v[3]);
-
-    ClassExpression::ObjectMinCardinality {
-        n: cardinality as u32,
-        ope: property,
-        bce: Box::new(filler),
-    }
-}
-
 pub fn translate_object_max_cardinality(v: &Value) -> ClassExpression<RcStr> {
     let cardinality = parse_string_cardinality(&v[1]);
 
@@ -297,19 +276,6 @@ pub fn translate_object_max_cardinality(v: &Value) -> ClassExpression<RcStr> {
     }
 }
 
-pub fn translate_object_max_qualified_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = parse_string_cardinality(&v[1]);
-
-    let property = translate_object_property_expression(&v[2]);
-    let filler: ClassExpression<RcStr> = translate_class_expression(&v[3]);
-
-    ClassExpression::ObjectMaxCardinality {
-        n: cardinality as u32,
-        ope: property,
-        bce: Box::new(filler),
-    }
-}
-
 pub fn translate_object_exact_cardinality(v: &Value) -> ClassExpression<RcStr> {
     let cardinality = parse_string_cardinality(&v[1]);
 
@@ -325,19 +291,6 @@ pub fn translate_object_exact_cardinality(v: &Value) -> ClassExpression<RcStr> {
     };
 
     //let filler: ClassExpression = b.class("http://www.w3.org/2002/07/owl#Thing").into();
-
-    ClassExpression::ObjectExactCardinality {
-        n: cardinality as u32,
-        ope: property,
-        bce: Box::new(filler),
-    }
-}
-
-pub fn translate_object_exact_qualified_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = parse_string_cardinality(&v[1]);
-
-    let property = translate_object_property_expression(&v[2]);
-    let filler: ClassExpression<RcStr> = translate_class_expression(&v[3]);
 
     ClassExpression::ObjectExactCardinality {
         n: cardinality as u32,
@@ -437,19 +390,6 @@ pub fn translate_data_min_cardinality(v: &Value) -> ClassExpression<RcStr> {
     }
 }
 
-pub fn translate_data_min_qualified_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = parse_number_cardinality(&v[1]);
-
-    let property = translate_data_property(&v[2]);
-    let filler: DataRange<RcStr> = translate_data_range(&v[3]);
-
-    ClassExpression::DataMinCardinality {
-        n: cardinality as u32,
-        dp: property,
-        dr: filler,
-    }
-}
-
 pub fn translate_data_max_cardinality(v: &Value) -> ClassExpression<RcStr> {
     let cardinality = parse_number_cardinality(&v[1]);
 
@@ -471,19 +411,6 @@ pub fn translate_data_max_cardinality(v: &Value) -> ClassExpression<RcStr> {
     }
 }
 
-pub fn translate_data_max_qualified_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = parse_number_cardinality(&v[1]);
-
-    let property = translate_data_property(&v[2]);
-    let filler: DataRange<RcStr> = translate_data_range(&v[3]);
-
-    ClassExpression::DataMaxCardinality {
-        n: cardinality as u32,
-        dp: property,
-        dr: filler,
-    }
-}
-
 pub fn translate_data_exact_cardinality(v: &Value) -> ClassExpression<RcStr> {
     let cardinality = parse_number_cardinality(&v[1]);
 
@@ -496,19 +423,6 @@ pub fn translate_data_exact_cardinality(v: &Value) -> ClassExpression<RcStr> {
     } else {
         default_data_filler()
     };
-
-    ClassExpression::DataExactCardinality {
-        n: cardinality as u32,
-        dp: property,
-        dr: filler,
-    }
-}
-
-pub fn translate_data_exact_qualified_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = parse_number_cardinality(&v[1]);
-
-    let property = translate_data_property(&v[2]);
-    let filler: DataRange<RcStr> = translate_data_range(&v[3]);
 
     ClassExpression::DataExactCardinality {
         n: cardinality as u32,
