@@ -232,10 +232,10 @@ pub fn translate_object_property_domain(v: &Value) -> Component<RcStr> {
 
 pub fn translate_object_property_range(v: &Value) -> Component<RcStr> {
     let property = expression_transducer::translate_object_property_expression(&v[1]);
-    let domain = expression_transducer::translate_class_expression(&v[2]);
+    let range = expression_transducer::translate_class_expression(&v[2]);
     let axiom = ObjectPropertyRange {
         ope: property,
-        ce: domain,
+        ce: range,
     };
     Component::ObjectPropertyRange(axiom)
 }
