@@ -15,7 +15,7 @@ pub fn translate_sub_object_property_expression(
     match expression {
         SubObjectPropertyExpression::ObjectPropertyChain(x) => {
             let operands: Vec<Value> = x
-                .into_iter()
+                .iter()
                 .map(|x| translate_object_property_expression(&x))
                 .collect();
             ofn_list("ObjectPropertyChain", operands)
@@ -100,7 +100,7 @@ pub fn translate_literal(literal: &Literal<ArcStr>) -> Value {
 
 pub fn translate_n_ary_operator(operator: &str, arguments: &Vec<ClassExpression<ArcStr>>) -> Value {
     let operands: Vec<Value> = arguments
-        .into_iter()
+        .iter()
         .map(|x| translate_class_expression(&x))
         .collect();
     ofn_list(operator, operands)
@@ -108,7 +108,7 @@ pub fn translate_n_ary_operator(operator: &str, arguments: &Vec<ClassExpression<
 
 pub fn translate_object_one_of(arguments: &Vec<Individual<ArcStr>>) -> Value {
     let operands: Vec<Value> = arguments
-        .into_iter()
+        .iter()
         .map(|x| translate_individual(&x))
         .collect();
     ofn_list("ObjectOneOf", operands)
@@ -191,7 +191,7 @@ pub fn translate_datatype(datatype: &Datatype<ArcStr>) -> Value {
 
 pub fn translate_data_intersection_of(arguments: &Vec<DataRange<ArcStr>>) -> Value {
     let operands: Vec<Value> = arguments
-        .into_iter()
+        .iter()
         .map(|x| translate_data_range(&x))
         .collect();
     ofn_list("DataIntersectionOf", operands)
@@ -199,7 +199,7 @@ pub fn translate_data_intersection_of(arguments: &Vec<DataRange<ArcStr>>) -> Val
 
 pub fn translate_data_union_of(arguments: &Vec<DataRange<ArcStr>>) -> Value {
     let operands: Vec<Value> = arguments
-        .into_iter()
+        .iter()
         .map(|x| translate_data_range(&x))
         .collect();
     ofn_list("DataUnionOf", operands)
@@ -212,7 +212,7 @@ pub fn translate_data_complement_of(argument: &Box<DataRange<ArcStr>>) -> Value 
 
 pub fn translate_data_one_of(arguments: &Vec<Literal<ArcStr>>) -> Value {
     let operands: Vec<Value> = arguments
-        .into_iter()
+        .iter()
         .map(|x| translate_literal(&x))
         .collect();
     ofn_list("DataOneOf", operands)
@@ -246,7 +246,7 @@ pub fn translate_datatype_restriction(
 ) -> Value {
     let datatype = translate_datatype(datatype);
     let mut operands: Vec<Value> = facets
-        .into_iter()
+        .iter()
         .map(|x| translate_facet_restriction(&x))
         .collect();
     operands.insert(0, datatype);
