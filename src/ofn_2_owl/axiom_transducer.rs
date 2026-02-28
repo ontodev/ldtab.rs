@@ -13,13 +13,13 @@ use horned_owl::model::{
     InverseFunctionalObjectProperty, InverseObjectProperties, IrreflexiveObjectProperty,
     NamedIndividual, NegativeDataPropertyAssertion, NegativeObjectPropertyAssertion,
     ObjectProperty, ObjectPropertyAssertion, ObjectPropertyDomain, ObjectPropertyExpression,
-    ObjectPropertyRange, RcStr, ReflexiveObjectProperty, SameIndividual, SubAnnotationPropertyOf,
+    ObjectPropertyRange, ArcStr, ReflexiveObjectProperty, SameIndividual, SubAnnotationPropertyOf,
     SubClassOf, SubDataPropertyOf, SubObjectPropertyOf, SymmetricObjectProperty,
     TransitiveObjectProperty,
 };
 use serde_json::Value;
 
-pub fn translate_axiom(v: &Value) -> Component<RcStr> {
+pub fn translate_axiom(v: &Value) -> Component<ArcStr> {
     match v[0].as_str() {
         //Ontology annotation
         //import
@@ -73,40 +73,40 @@ pub fn translate_axiom(v: &Value) -> Component<RcStr> {
     }
 }
 
-pub fn translate_named_class(v: &Value) -> Class<RcStr> {
+pub fn translate_named_class(v: &Value) -> Class<ArcStr> {
     build().class(extract_iri_str(v)).into()
 }
 
-pub fn translate_import(v: &Value) -> Component<RcStr> {
+pub fn translate_import(v: &Value) -> Component<ArcStr> {
     let import = build().iri(extract_iri_str(&v[2])).into();
 
     let axiom = Import(import);
     Component::Import(axiom)
 }
 
-pub fn translate_object_property(v: &Value) -> ObjectProperty<RcStr> {
+pub fn translate_object_property(v: &Value) -> ObjectProperty<ArcStr> {
     build().object_property(extract_iri_str(v)).into()
 }
 
-pub fn translate_annotation_property(v: &Value) -> AnnotationProperty<RcStr> {
+pub fn translate_annotation_property(v: &Value) -> AnnotationProperty<ArcStr> {
     build().annotation_property(extract_iri_str(v)).into()
 }
 
-pub fn translate_named_individual(v: &Value) -> NamedIndividual<RcStr> {
+pub fn translate_named_individual(v: &Value) -> NamedIndividual<ArcStr> {
     build().named_individual(extract_iri_str(v)).into()
 }
 
 //TODO refactor this into expression_transducer
 
-pub fn translate_subclass_of(v: &Value) -> Component<RcStr> {
+pub fn translate_subclass_of(v: &Value) -> Component<ArcStr> {
     let sub = expression_transducer::translate_class_expression(&v[1]);
     let sup = expression_transducer::translate_class_expression(&v[2]);
     let axiom = SubClassOf { sub: sub, sup: sup };
     Component::SubClassOf(axiom)
 }
 
-pub fn translate_equivalent_classes(v: &Value) -> Component<RcStr> {
-    let operands: Vec<ClassExpression<RcStr>> = v.as_array().unwrap()[1..]
+pub fn translate_equivalent_classes(v: &Value) -> Component<ArcStr> {
+    let operands: Vec<ClassExpression<ArcStr>> = v.as_array().unwrap()[1..]
         .iter()
         .map(|x| expression_transducer::translate_class_expression(x))
         .collect();
@@ -114,8 +114,8 @@ pub fn translate_equivalent_classes(v: &Value) -> Component<RcStr> {
     Component::EquivalentClasses(axiom)
 }
 
-pub fn translate_disjoint_classes(v: &Value) -> Component<RcStr> {
-    let operands: Vec<ClassExpression<RcStr>> = v.as_array().unwrap()[1..]
+pub fn translate_disjoint_classes(v: &Value) -> Component<ArcStr> {
+    let operands: Vec<ClassExpression<ArcStr>> = v.as_array().unwrap()[1..]
         .iter()
         .map(|x| expression_transducer::translate_class_expression(x))
         .collect();
@@ -123,12 +123,12 @@ pub fn translate_disjoint_classes(v: &Value) -> Component<RcStr> {
     Component::DisjointClasses(axiom)
 }
 
-pub fn translate_disjoint_union(v: &Value) -> Component<RcStr> {
+pub fn translate_disjoint_union(v: &Value) -> Component<ArcStr> {
     //NB: we need a (named) class here - not a class expression
     //let lhs = expression_transducer::translate_class_expression(&v[1]);
     let lhs = translate_named_class(&v[1]);
 
-    let operands: Vec<ClassExpression<RcStr>> = v.as_array().unwrap()[2..]
+    let operands: Vec<ClassExpression<ArcStr>> = v.as_array().unwrap()[2..]
         .iter()
         .map(|x| expression_transducer::translate_class_expression(x))
         .collect();
@@ -139,43 +139,43 @@ pub fn translate_disjoint_union(v: &Value) -> Component<RcStr> {
     Component::DisjointUnion(axiom)
 }
 
-pub fn translate_class_declaration(v: &Value) -> Component<RcStr> {
+pub fn translate_class_declaration(v: &Value) -> Component<ArcStr> {
     let class = translate_named_class(&v[1]);
     let axiom = DeclareClass { 0: class };
     Component::DeclareClass(axiom)
 }
 
-pub fn translate_object_property_declaration(v: &Value) -> Component<RcStr> {
+pub fn translate_object_property_declaration(v: &Value) -> Component<ArcStr> {
     let property = translate_object_property(&v[1]);
     let axiom = DeclareObjectProperty { 0: property };
     Component::DeclareObjectProperty(axiom)
 }
 
-pub fn translate_data_property_declaration(v: &Value) -> Component<RcStr> {
+pub fn translate_data_property_declaration(v: &Value) -> Component<ArcStr> {
     let property = expression_transducer::translate_data_property(&v[1]);
     let axiom = DeclareDataProperty { 0: property };
     Component::DeclareDataProperty(axiom)
 }
 
-pub fn translate_annotation_property_declaration(v: &Value) -> Component<RcStr> {
+pub fn translate_annotation_property_declaration(v: &Value) -> Component<ArcStr> {
     let property = translate_annotation_property(&v[1]);
     let axiom = DeclareAnnotationProperty { 0: property };
     Component::DeclareAnnotationProperty(axiom)
 }
 
-pub fn translate_named_individual_declaration(v: &Value) -> Component<RcStr> {
+pub fn translate_named_individual_declaration(v: &Value) -> Component<ArcStr> {
     let individual = translate_named_individual(&v[1]);
     let axiom = DeclareNamedIndividual { 0: individual };
     Component::DeclareNamedIndividual(axiom)
 }
 
-pub fn translate_datatype_declaration(v: &Value) -> Component<RcStr> {
+pub fn translate_datatype_declaration(v: &Value) -> Component<ArcStr> {
     let datatype = expression_transducer::translate_datatype(&v[1]);
     let axiom = DeclareDatatype { 0: datatype };
     Component::DeclareDatatype(axiom)
 }
 
-pub fn translate_declaration(v: &Value) -> Component<RcStr> {
+pub fn translate_declaration(v: &Value) -> Component<ArcStr> {
     let declaration = &v[1];
     match declaration[0].as_str() {
         Some("Class") => translate_class_declaration(declaration),
@@ -188,15 +188,15 @@ pub fn translate_declaration(v: &Value) -> Component<RcStr> {
     }
 }
 
-pub fn translate_sub_object_property_of(v: &Value) -> Component<RcStr> {
+pub fn translate_sub_object_property_of(v: &Value) -> Component<ArcStr> {
     let lhs = expression_transducer::translate_sub_object_property_expression(&v[1]);
     let rhs = expression_transducer::translate_object_property_expression(&v[2]);
     let axiom = SubObjectPropertyOf { sub: lhs, sup: rhs };
     Component::SubObjectPropertyOf(axiom)
 }
 
-pub fn translate_equivalent_object_properties(v: &Value) -> Component<RcStr> {
-    let operands: Vec<ObjectPropertyExpression<RcStr>> = v.as_array().unwrap()[1..]
+pub fn translate_equivalent_object_properties(v: &Value) -> Component<ArcStr> {
+    let operands: Vec<ObjectPropertyExpression<ArcStr>> = v.as_array().unwrap()[1..]
         .iter()
         .map(|x| expression_transducer::translate_object_property_expression(x))
         .collect();
@@ -204,8 +204,8 @@ pub fn translate_equivalent_object_properties(v: &Value) -> Component<RcStr> {
     Component::EquivalentObjectProperties(axiom)
 }
 
-pub fn translate_disjoint_object_properties(v: &Value) -> Component<RcStr> {
-    let operands: Vec<ObjectPropertyExpression<RcStr>> = v.as_array().unwrap()[1..]
+pub fn translate_disjoint_object_properties(v: &Value) -> Component<ArcStr> {
+    let operands: Vec<ObjectPropertyExpression<ArcStr>> = v.as_array().unwrap()[1..]
         .iter()
         .map(|x| expression_transducer::translate_object_property_expression(x))
         .collect();
@@ -213,14 +213,14 @@ pub fn translate_disjoint_object_properties(v: &Value) -> Component<RcStr> {
     Component::DisjointObjectProperties(axiom)
 }
 
-pub fn translate_inverse_object_properties(v: &Value) -> Component<RcStr> {
+pub fn translate_inverse_object_properties(v: &Value) -> Component<ArcStr> {
     let lhs = translate_object_property(&v[1]);
     let rhs = translate_object_property(&v[2]);
     let axiom = InverseObjectProperties { 0: lhs, 1: rhs };
     Component::InverseObjectProperties(axiom)
 }
 
-pub fn translate_object_property_domain(v: &Value) -> Component<RcStr> {
+pub fn translate_object_property_domain(v: &Value) -> Component<ArcStr> {
     let property = expression_transducer::translate_object_property_expression(&v[1]);
     let domain = expression_transducer::translate_class_expression(&v[2]);
     let axiom = ObjectPropertyDomain {
@@ -230,7 +230,7 @@ pub fn translate_object_property_domain(v: &Value) -> Component<RcStr> {
     Component::ObjectPropertyDomain(axiom)
 }
 
-pub fn translate_object_property_range(v: &Value) -> Component<RcStr> {
+pub fn translate_object_property_range(v: &Value) -> Component<ArcStr> {
     let property = expression_transducer::translate_object_property_expression(&v[1]);
     let range = expression_transducer::translate_class_expression(&v[2]);
     let axiom = ObjectPropertyRange {
@@ -240,49 +240,49 @@ pub fn translate_object_property_range(v: &Value) -> Component<RcStr> {
     Component::ObjectPropertyRange(axiom)
 }
 
-pub fn translate_functional_object_property(v: &Value) -> Component<RcStr> {
+pub fn translate_functional_object_property(v: &Value) -> Component<ArcStr> {
     let property = expression_transducer::translate_object_property_expression(&v[1]);
     let axiom = FunctionalObjectProperty { 0: property };
     Component::FunctionalObjectProperty(axiom)
 }
 
-pub fn translate_inverse_functional_object_property(v: &Value) -> Component<RcStr> {
+pub fn translate_inverse_functional_object_property(v: &Value) -> Component<ArcStr> {
     let property = expression_transducer::translate_object_property_expression(&v[1]);
     let axiom = InverseFunctionalObjectProperty { 0: property };
     Component::InverseFunctionalObjectProperty(axiom)
 }
 
-pub fn translate_reflexive_object_property(v: &Value) -> Component<RcStr> {
+pub fn translate_reflexive_object_property(v: &Value) -> Component<ArcStr> {
     let property = expression_transducer::translate_object_property_expression(&v[1]);
     let axiom = ReflexiveObjectProperty { 0: property };
     Component::ReflexiveObjectProperty(axiom)
 }
 
-pub fn translate_irreflexive_object_property(v: &Value) -> Component<RcStr> {
+pub fn translate_irreflexive_object_property(v: &Value) -> Component<ArcStr> {
     let property = expression_transducer::translate_object_property_expression(&v[1]);
     let axiom = IrreflexiveObjectProperty { 0: property };
     Component::IrreflexiveObjectProperty(axiom)
 }
 
-pub fn translate_symmetric_object_property(v: &Value) -> Component<RcStr> {
+pub fn translate_symmetric_object_property(v: &Value) -> Component<ArcStr> {
     let property = expression_transducer::translate_object_property_expression(&v[1]);
     let axiom = SymmetricObjectProperty { 0: property };
     Component::SymmetricObjectProperty(axiom)
 }
 
-pub fn translate_asymmetric_object_property(v: &Value) -> Component<RcStr> {
+pub fn translate_asymmetric_object_property(v: &Value) -> Component<ArcStr> {
     let property = expression_transducer::translate_object_property_expression(&v[1]);
     let axiom = AsymmetricObjectProperty { 0: property };
     Component::AsymmetricObjectProperty(axiom)
 }
 
-pub fn translate_transitive_object_property(v: &Value) -> Component<RcStr> {
+pub fn translate_transitive_object_property(v: &Value) -> Component<ArcStr> {
     let property = expression_transducer::translate_object_property_expression(&v[1]);
     let axiom = TransitiveObjectProperty { 0: property };
     Component::TransitiveObjectProperty(axiom)
 }
 
-pub fn translate_sub_dataproperty_of(v: &Value) -> Component<RcStr> {
+pub fn translate_sub_dataproperty_of(v: &Value) -> Component<ArcStr> {
     let lhs = expression_transducer::translate_data_property(&v[1]);
     let rhs = expression_transducer::translate_data_property(&v[2]);
 
@@ -290,8 +290,8 @@ pub fn translate_sub_dataproperty_of(v: &Value) -> Component<RcStr> {
     Component::SubDataPropertyOf(axiom)
 }
 
-pub fn translate_equivalent_data_properties(v: &Value) -> Component<RcStr> {
-    let operands: Vec<DataProperty<RcStr>> = v.as_array().unwrap()[1..]
+pub fn translate_equivalent_data_properties(v: &Value) -> Component<ArcStr> {
+    let operands: Vec<DataProperty<ArcStr>> = v.as_array().unwrap()[1..]
         .iter()
         .map(|x| expression_transducer::translate_data_property(x))
         .collect();
@@ -299,8 +299,8 @@ pub fn translate_equivalent_data_properties(v: &Value) -> Component<RcStr> {
     Component::EquivalentDataProperties(axiom)
 }
 
-pub fn translate_disjoint_data_properties(v: &Value) -> Component<RcStr> {
-    let operands: Vec<DataProperty<RcStr>> = v.as_array().unwrap()[1..]
+pub fn translate_disjoint_data_properties(v: &Value) -> Component<ArcStr> {
+    let operands: Vec<DataProperty<ArcStr>> = v.as_array().unwrap()[1..]
         .iter()
         .map(|x| expression_transducer::translate_data_property(x))
         .collect();
@@ -308,7 +308,7 @@ pub fn translate_disjoint_data_properties(v: &Value) -> Component<RcStr> {
     Component::DisjointDataProperties(axiom)
 }
 
-pub fn translate_data_property_domain(v: &Value) -> Component<RcStr> {
+pub fn translate_data_property_domain(v: &Value) -> Component<ArcStr> {
     let property = expression_transducer::translate_data_property(&v[1]);
     let domain = expression_transducer::translate_class_expression(&v[2]);
 
@@ -319,7 +319,7 @@ pub fn translate_data_property_domain(v: &Value) -> Component<RcStr> {
     Component::DataPropertyDomain(axiom)
 }
 
-pub fn translate_data_property_range(v: &Value) -> Component<RcStr> {
+pub fn translate_data_property_range(v: &Value) -> Component<ArcStr> {
     let property = expression_transducer::translate_data_property(&v[1]);
     let range = expression_transducer::translate_data_range(&v[2]);
 
@@ -330,14 +330,14 @@ pub fn translate_data_property_range(v: &Value) -> Component<RcStr> {
     Component::DataPropertyRange(axiom)
 }
 
-pub fn translate_functional_data_property(v: &Value) -> Component<RcStr> {
+pub fn translate_functional_data_property(v: &Value) -> Component<ArcStr> {
     let property = expression_transducer::translate_data_property(&v[1]);
 
     let axiom = FunctionalDataProperty { 0: property };
     Component::FunctionalDataProperty(axiom)
 }
 
-pub fn translate_datatype_definition(v: &Value) -> Component<RcStr> {
+pub fn translate_datatype_definition(v: &Value) -> Component<ArcStr> {
     let kind = expression_transducer::translate_datatype(&v[1]);
     let range = expression_transducer::translate_data_range(&v[2]);
 
@@ -359,8 +359,8 @@ pub fn translate_datatype_definition(v: &Value) -> Component<RcStr> {
 //
 //}
 
-pub fn translate_same_individual(v: &Value) -> Component<RcStr> {
-    let operands: Vec<Individual<RcStr>> = v.as_array().unwrap()[1..]
+pub fn translate_same_individual(v: &Value) -> Component<ArcStr> {
+    let operands: Vec<Individual<ArcStr>> = v.as_array().unwrap()[1..]
         .iter()
         .map(|x| expression_transducer::translate_individual(x))
         .collect();
@@ -369,8 +369,8 @@ pub fn translate_same_individual(v: &Value) -> Component<RcStr> {
     Component::SameIndividual(axiom)
 }
 
-pub fn translate_different_individuals(v: &Value) -> Component<RcStr> {
-    let operands: Vec<Individual<RcStr>> = v.as_array().unwrap()[1..]
+pub fn translate_different_individuals(v: &Value) -> Component<ArcStr> {
+    let operands: Vec<Individual<ArcStr>> = v.as_array().unwrap()[1..]
         .iter()
         .map(|x| expression_transducer::translate_individual(x))
         .collect();
@@ -379,7 +379,7 @@ pub fn translate_different_individuals(v: &Value) -> Component<RcStr> {
     Component::DifferentIndividuals(axiom)
 }
 
-pub fn translate_class_assertion(v: &Value) -> Component<RcStr> {
+pub fn translate_class_assertion(v: &Value) -> Component<ArcStr> {
     let class_expression = expression_transducer::translate_class_expression(&v[1]);
     let individual = expression_transducer::translate_individual(&v[2]);
 
@@ -390,7 +390,7 @@ pub fn translate_class_assertion(v: &Value) -> Component<RcStr> {
     Component::ClassAssertion(axiom)
 }
 
-pub fn translate_object_property_assertion(v: &Value) -> Component<RcStr> {
+pub fn translate_object_property_assertion(v: &Value) -> Component<ArcStr> {
     let property = expression_transducer::translate_object_property_expression(&v[1]);
     let from = expression_transducer::translate_individual(&v[2]);
     let to = expression_transducer::translate_individual(&v[3]);
@@ -403,7 +403,7 @@ pub fn translate_object_property_assertion(v: &Value) -> Component<RcStr> {
     Component::ObjectPropertyAssertion(axiom)
 }
 
-pub fn translate_negative_object_property_assertion(v: &Value) -> Component<RcStr> {
+pub fn translate_negative_object_property_assertion(v: &Value) -> Component<ArcStr> {
     let property = expression_transducer::translate_object_property_expression(&v[1]);
     let from = expression_transducer::translate_individual(&v[2]);
     let to = expression_transducer::translate_individual(&v[3]);
@@ -416,7 +416,7 @@ pub fn translate_negative_object_property_assertion(v: &Value) -> Component<RcSt
     Component::NegativeObjectPropertyAssertion(axiom)
 }
 
-pub fn translate_data_property_assertion(v: &Value) -> Component<RcStr> {
+pub fn translate_data_property_assertion(v: &Value) -> Component<ArcStr> {
     let property = expression_transducer::translate_data_property(&v[1]);
     let from = expression_transducer::translate_individual(&v[2]);
     let to = expression_transducer::translate_literal(&v[3]);
@@ -429,7 +429,7 @@ pub fn translate_data_property_assertion(v: &Value) -> Component<RcStr> {
     Component::DataPropertyAssertion(axiom)
 }
 
-pub fn translate_negative_data_property_assertion(v: &Value) -> Component<RcStr> {
+pub fn translate_negative_data_property_assertion(v: &Value) -> Component<ArcStr> {
     let property = expression_transducer::translate_data_property(&v[1]);
     let from = expression_transducer::translate_individual(&v[2]);
     let to = expression_transducer::translate_literal(&v[3]);
@@ -442,7 +442,7 @@ pub fn translate_negative_data_property_assertion(v: &Value) -> Component<RcStr>
     Component::NegativeDataPropertyAssertion(axiom)
 }
 
-pub fn translate_annotation_assertion(v: &Value) -> Component<RcStr> {
+pub fn translate_annotation_assertion(v: &Value) -> Component<ArcStr> {
     let property = annotation_transducer::translate_annotation_property(&v[1]);
     let subject = annotation_transducer::translate_annotation_subject(&v[2]);
     let value = annotation_transducer::translate_annotation_value(&v[3]);
@@ -459,7 +459,7 @@ pub fn translate_annotation_assertion(v: &Value) -> Component<RcStr> {
     Component::AnnotationAssertion(axiom)
 }
 
-pub fn translate_sub_annotation_assertion(v: &Value) -> Component<RcStr> {
+pub fn translate_sub_annotation_assertion(v: &Value) -> Component<ArcStr> {
     let sub = annotation_transducer::translate_annotation_property(&v[1]);
     let sup = annotation_transducer::translate_annotation_property(&v[2]);
 
@@ -467,7 +467,7 @@ pub fn translate_sub_annotation_assertion(v: &Value) -> Component<RcStr> {
     Component::SubAnnotationPropertyOf(axiom)
 }
 
-pub fn translate_annotation_property_domain(v: &Value) -> Component<RcStr> {
+pub fn translate_annotation_property_domain(v: &Value) -> Component<ArcStr> {
     let property = annotation_transducer::translate_annotation_property(&v[1]);
 
     let iri = build().iri(extract_iri_str(&v[2]));
@@ -479,7 +479,7 @@ pub fn translate_annotation_property_domain(v: &Value) -> Component<RcStr> {
     Component::AnnotationPropertyDomain(axiom)
 }
 
-pub fn translate_annotation_property_range(v: &Value) -> Component<RcStr> {
+pub fn translate_annotation_property_range(v: &Value) -> Component<ArcStr> {
     let property = annotation_transducer::translate_annotation_property(&v[1]);
 
     let iri = build().iri(extract_iri_str(&v[2]));

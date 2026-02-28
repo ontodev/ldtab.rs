@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use serde_json::Value;
 
-use horned_owl::model::{Build, ClassExpression, DataRange, RcStr};
+use horned_owl::model::{Build, ClassExpression, DataRange, ArcStr};
 
 static ANONYMOUS_RE: Lazy<Regex> = Lazy::new(|| Regex::new("^(.*)_:(.+)$").unwrap());
 static LITERAL_RE: Lazy<Regex> = Lazy::new(|| Regex::new("(?s)^\"(.*)\"(.*)$").unwrap());
@@ -34,15 +34,15 @@ pub fn extract_iri_str(v: &Value) -> &str {
     v.as_str().expect("Expected an IRI string")
 }
 
-pub fn build() -> Build<RcStr> {
+pub fn build() -> Build<ArcStr> {
     Build::new()
 }
 
-pub fn default_class_filler() -> ClassExpression<RcStr> {
+pub fn default_class_filler() -> ClassExpression<ArcStr> {
     build().class("http://www.w3.org/2002/07/owl#Thing").into()
 }
 
-pub fn default_data_filler() -> DataRange<RcStr> {
+pub fn default_data_filler() -> DataRange<ArcStr> {
     DataRange::Datatype(build().datatype("rdfs:Literal"))
 }
 

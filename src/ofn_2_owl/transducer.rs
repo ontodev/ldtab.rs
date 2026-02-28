@@ -1,6 +1,6 @@
 use crate::ofn_2_owl::annotation_transducer;
 use crate::ofn_2_owl::axiom_transducer;
-use horned_owl::model::{AnnotatedComponent, RcStr};
+use horned_owl::model::{AnnotatedComponent, ArcStr};
 use serde_json::Value;
 use std::collections::BTreeSet;
 
@@ -15,7 +15,7 @@ use std::collections::BTreeSet;
 ///
 /// println!("{:?}", axiom);
 
-pub fn translate(ofn: &Value) -> AnnotatedComponent<RcStr> {
+pub fn translate(ofn: &Value) -> AnnotatedComponent<ArcStr> {
     //split logic from annotation
     let owl = get_owl(ofn);
     let annotations = get_annotations(ofn);
