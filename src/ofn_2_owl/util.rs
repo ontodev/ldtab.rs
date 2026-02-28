@@ -45,3 +45,14 @@ pub fn default_class_filler() -> ClassExpression<RcStr> {
 pub fn default_data_filler() -> DataRange<RcStr> {
     DataRange::Datatype(build().datatype("rdfs:Literal"))
 }
+
+pub fn parse_string_cardinality(v: &Value) -> u32 {
+    v.as_str()
+        .expect("Expected a string for cardinality")
+        .parse::<u32>()
+        .expect("Expected a valid cardinality number")
+}
+
+pub fn parse_number_cardinality(v: &Value) -> u32 {
+    v.as_u64().expect("Expected a valid cardinality number") as u32
+}

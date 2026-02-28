@@ -3,7 +3,10 @@ use regex::Regex;
 use serde_json::Value;
 use std::rc::Rc;
 //use std::sync::Arc;
-use crate::ofn_2_owl::util::{build, default_class_filler, default_data_filler, extract_iri_str};
+use crate::ofn_2_owl::util::{
+    build, default_class_filler, default_data_filler, extract_iri_str, parse_number_cardinality,
+    parse_string_cardinality,
+};
 use horned_owl::model::{
     AnonymousIndividual, ClassExpression, DataProperty, DataRange, Datatype, Individual, Literal,
     ObjectPropertyExpression, RcStr, SubObjectPropertyExpression,
@@ -247,13 +250,7 @@ pub fn translate_object_has_value(v: &Value) -> ClassExpression<RcStr> {
 }
 
 pub fn translate_object_min_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = match v[1].clone() {
-        Value::String(x) => {
-            let num: i32 = x.parse().unwrap();
-            num
-        }
-        _ => panic!("Not a named entity"),
-    };
+    let cardinality = parse_string_cardinality(&v[1]);
 
     let property = translate_object_property_expression(&v[2]);
 
@@ -276,13 +273,7 @@ pub fn translate_object_min_cardinality(v: &Value) -> ClassExpression<RcStr> {
 }
 
 pub fn translate_object_min_qualified_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = match v[1].clone() {
-        Value::String(x) => {
-            let num: i32 = x.parse().unwrap();
-            num
-        }
-        _ => panic!("Not a named entity"),
-    };
+    let cardinality = parse_string_cardinality(&v[1]);
 
     let property = translate_object_property_expression(&v[2]);
     let filler: ClassExpression<RcStr> = translate_class_expression(&v[3]);
@@ -295,13 +286,7 @@ pub fn translate_object_min_qualified_cardinality(v: &Value) -> ClassExpression<
 }
 
 pub fn translate_object_max_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = match v[1].clone() {
-        Value::String(x) => {
-            let num: i32 = x.parse().unwrap();
-            num
-        }
-        _ => panic!("Not a named entity"),
-    };
+    let cardinality = parse_string_cardinality(&v[1]);
 
     let property = translate_object_property_expression(&v[2]);
 
@@ -324,13 +309,7 @@ pub fn translate_object_max_cardinality(v: &Value) -> ClassExpression<RcStr> {
 }
 
 pub fn translate_object_max_qualified_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = match v[1].clone() {
-        Value::String(x) => {
-            let num: i32 = x.parse().unwrap();
-            num
-        }
-        _ => panic!("Not a named entity"),
-    };
+    let cardinality = parse_string_cardinality(&v[1]);
 
     let property = translate_object_property_expression(&v[2]);
     let filler: ClassExpression<RcStr> = translate_class_expression(&v[3]);
@@ -343,13 +322,7 @@ pub fn translate_object_max_qualified_cardinality(v: &Value) -> ClassExpression<
 }
 
 pub fn translate_object_exact_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = match v[1].clone() {
-        Value::String(x) => {
-            let num: i32 = x.parse().unwrap();
-            num
-        }
-        _ => panic!("Not a named entity"),
-    };
+    let cardinality = parse_string_cardinality(&v[1]);
 
     let property = translate_object_property_expression(&v[2]);
 
@@ -372,13 +345,7 @@ pub fn translate_object_exact_cardinality(v: &Value) -> ClassExpression<RcStr> {
 }
 
 pub fn translate_object_exact_qualified_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = match v[1].clone() {
-        Value::String(x) => {
-            let num: i32 = x.parse().unwrap();
-            num
-        }
-        _ => panic!("Not a named entity"),
-    };
+    let cardinality = parse_string_cardinality(&v[1]);
 
     let property = translate_object_property_expression(&v[2]);
     let filler: ClassExpression<RcStr> = translate_class_expression(&v[3]);
@@ -459,13 +426,7 @@ pub fn translate_data_has_value(v: &Value) -> ClassExpression<RcStr> {
 }
 
 pub fn translate_data_min_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = match v[1].clone() {
-        Value::Number(x) => match x.as_u64() {
-            Some(y) => y,
-            _ => panic!("Not a valid cardinality"),
-        },
-        _ => panic!("Not a named entity"),
-    };
+    let cardinality = parse_number_cardinality(&v[1]);
 
     let property = translate_data_property(&v[2]);
 
@@ -488,13 +449,7 @@ pub fn translate_data_min_cardinality(v: &Value) -> ClassExpression<RcStr> {
 }
 
 pub fn translate_data_min_qualified_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = match v[1].clone() {
-        Value::Number(x) => match x.as_u64() {
-            Some(y) => y,
-            _ => panic!("Not a valid cardinality"),
-        },
-        _ => panic!("Not a named entity"),
-    };
+    let cardinality = parse_number_cardinality(&v[1]);
 
     let property = translate_data_property(&v[2]);
     let filler: DataRange<RcStr> = translate_data_range(&v[3]);
@@ -507,13 +462,7 @@ pub fn translate_data_min_qualified_cardinality(v: &Value) -> ClassExpression<Rc
 }
 
 pub fn translate_data_max_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = match v[1].clone() {
-        Value::Number(x) => match x.as_u64() {
-            Some(y) => y,
-            _ => panic!("Not a valid cardinality"),
-        },
-        _ => panic!("Not a named entity"),
-    };
+    let cardinality = parse_number_cardinality(&v[1]);
 
     let property = translate_data_property(&v[2]);
 
@@ -534,13 +483,7 @@ pub fn translate_data_max_cardinality(v: &Value) -> ClassExpression<RcStr> {
 }
 
 pub fn translate_data_max_qualified_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = match v[1].clone() {
-        Value::Number(x) => match x.as_u64() {
-            Some(y) => y,
-            _ => panic!("Not a valid cardinality"),
-        },
-        _ => panic!("Not a named entity"),
-    };
+    let cardinality = parse_number_cardinality(&v[1]);
 
     let property = translate_data_property(&v[2]);
     let filler: DataRange<RcStr> = translate_data_range(&v[3]);
@@ -553,13 +496,7 @@ pub fn translate_data_max_qualified_cardinality(v: &Value) -> ClassExpression<Rc
 }
 
 pub fn translate_data_exact_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = match v[1].clone() {
-        Value::Number(x) => match x.as_u64() {
-            Some(y) => y,
-            _ => panic!("Not a valid cardinality"),
-        },
-        _ => panic!("Not a named entity"),
-    };
+    let cardinality = parse_number_cardinality(&v[1]);
 
     let property = translate_data_property(&v[2]);
 
@@ -579,13 +516,7 @@ pub fn translate_data_exact_cardinality(v: &Value) -> ClassExpression<RcStr> {
 }
 
 pub fn translate_data_exact_qualified_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let cardinality = match v[1].clone() {
-        Value::Number(x) => match x.as_u64() {
-            Some(y) => y,
-            _ => panic!("Not a valid cardinality"),
-        },
-        _ => panic!("Not a named entity"),
-    };
+    let cardinality = parse_number_cardinality(&v[1]);
 
     let property = translate_data_property(&v[2]);
     let filler: DataRange<RcStr> = translate_data_range(&v[3]);
