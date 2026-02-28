@@ -52,13 +52,7 @@ pub fn get_owl(ofn: &Value) -> Value {
 }
 
 pub fn is_annotation(v: &Value) -> bool {
-    match v {
-        Value::Array(x) => match x[0].as_str() {
-            Some("Annotation") => true,
-            _ => false,
-        },
-        _ => false,
-    }
+    matches!(v, Value::Array(x) if x[0].as_str() == Some("Annotation"))
 }
 
 pub fn get_annotations(ofn: &Value) -> Vec<Value> {
