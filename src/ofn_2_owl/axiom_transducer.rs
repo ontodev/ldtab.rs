@@ -176,17 +176,15 @@ pub fn translate_datatype_declaration(v: &Value) -> Component<RcStr> {
 }
 
 pub fn translate_declaration(v: &Value) -> Component<RcStr> {
-    let unwrapped_declaration = v[1].clone();
-    match unwrapped_declaration[0].as_str() {
-        Some("Class") => translate_class_declaration(&unwrapped_declaration),
-        Some("ObjectProperty") => translate_object_property_declaration(&unwrapped_declaration),
-        Some("DataProperty") => translate_data_property_declaration(&unwrapped_declaration),
-        Some("AnnotationProperty") => {
-            translate_annotation_property_declaration(&unwrapped_declaration)
-        }
-        Some("NamedIndividual") => translate_named_individual_declaration(&unwrapped_declaration),
-        Some("Datatype") => translate_datatype_declaration(&unwrapped_declaration),
-        _ => panic!(),
+    let declaration = &v[1];
+    match declaration[0].as_str() {
+        Some("Class") => translate_class_declaration(declaration),
+        Some("ObjectProperty") => translate_object_property_declaration(declaration),
+        Some("DataProperty") => translate_data_property_declaration(declaration),
+        Some("AnnotationProperty") => translate_annotation_property_declaration(declaration),
+        Some("NamedIndividual") => translate_named_individual_declaration(declaration),
+        Some("Datatype") => translate_datatype_declaration(declaration),
+        _ => panic!(), //TODO
     }
 }
 

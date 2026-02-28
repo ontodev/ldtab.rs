@@ -52,19 +52,18 @@ pub fn get_owl(ofn: &Value) -> Value {
 }
 
 pub fn is_annotation(v: &Value) -> bool {
-    match v.clone() {
+    match v {
         Value::Array(x) => match x[0].as_str() {
             Some("Annotation") => true,
-            Some(_) => false,
-            None => false,
+            _ => false,
         },
         _ => false,
     }
 }
 
 pub fn has_annotation(v: &Value) -> bool {
-    match v.clone() {
-        Value::Array(x) => is_annotation(&x[1]), //look into second argument
+    match v {
+        Value::Array(x) => is_annotation(&x[1]),
         _ => false,
     }
 }
