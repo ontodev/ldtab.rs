@@ -1,9 +1,9 @@
 use crate::ofn_2_owl::annotation_transducer;
 use crate::ofn_2_owl::expression_transducer;
-use crate::ofn_2_owl::util::extract_iri_str;
+use crate::ofn_2_owl::util::{build, extract_iri_str};
 use horned_owl::model::{
     Annotation, AnnotationAssertion, AnnotationProperty, AnnotationPropertyDomain,
-    AnnotationPropertyRange, AsymmetricObjectProperty, Build, Class, ClassAssertion,
+    AnnotationPropertyRange, AsymmetricObjectProperty, Class, ClassAssertion,
     ClassExpression, Component, DataProperty, DataPropertyAssertion, DataPropertyDomain,
     DataPropertyRange, DatatypeDefinition, DeclareAnnotationProperty, DeclareClass,
     DeclareDataProperty, DeclareDatatype, DeclareNamedIndividual, DeclareObjectProperty,
@@ -74,31 +74,26 @@ pub fn translate_axiom(v: &Value) -> Component<RcStr> {
 }
 
 pub fn translate_named_class(v: &Value) -> Class<RcStr> {
-    let b = Build::new();
-    b.class(extract_iri_str(v)).into()
+    build().class(extract_iri_str(v)).into()
 }
 
 pub fn translate_import(v: &Value) -> Component<RcStr> {
-    let b = Build::new();
-    let import = b.iri(extract_iri_str(&v[2])).into();
+    let import = build().iri(extract_iri_str(&v[2])).into();
 
     let axiom = Import(import);
     Component::Import(axiom)
 }
 
 pub fn translate_object_property(v: &Value) -> ObjectProperty<RcStr> {
-    let b = Build::new();
-    b.object_property(extract_iri_str(v)).into()
+    build().object_property(extract_iri_str(v)).into()
 }
 
 pub fn translate_annotation_property(v: &Value) -> AnnotationProperty<RcStr> {
-    let b = Build::new();
-    b.annotation_property(extract_iri_str(v)).into()
+    build().annotation_property(extract_iri_str(v)).into()
 }
 
 pub fn translate_named_individual(v: &Value) -> NamedIndividual<RcStr> {
-    let b = Build::new();
-    b.named_individual(extract_iri_str(v)).into()
+    build().named_individual(extract_iri_str(v)).into()
 }
 
 //TODO refactor this into expression_transducer
@@ -477,8 +472,7 @@ pub fn translate_sub_annotation_assertion(v: &Value) -> Component<RcStr> {
 pub fn translate_annotation_property_domain(v: &Value) -> Component<RcStr> {
     let property = annotation_transducer::translate_annotation_property(&v[1]);
 
-    let b = Build::new();
-    let iri = b.iri(extract_iri_str(&v[2]));
+    let iri = build().iri(extract_iri_str(&v[2]));
 
     let axiom = AnnotationPropertyDomain {
         ap: property,
@@ -490,8 +484,7 @@ pub fn translate_annotation_property_domain(v: &Value) -> Component<RcStr> {
 pub fn translate_annotation_property_range(v: &Value) -> Component<RcStr> {
     let property = annotation_transducer::translate_annotation_property(&v[1]);
 
-    let b = Build::new();
-    let iri = b.iri(extract_iri_str(&v[2]));
+    let iri = build().iri(extract_iri_str(&v[2]));
 
     let axiom = AnnotationPropertyRange {
         ap: property,

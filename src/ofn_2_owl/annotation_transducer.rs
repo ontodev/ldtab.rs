@@ -1,8 +1,8 @@
 use crate::ofn_2_owl::expression_transducer;
 use crate::ofn_2_owl::util;
-use crate::ofn_2_owl::util::extract_iri_str;
+use crate::ofn_2_owl::util::{build, extract_iri_str};
 use horned_owl::model::{
-    Annotation, AnnotationProperty, AnnotationSubject, AnnotationValue, Build, RcStr,
+    Annotation, AnnotationProperty, AnnotationSubject, AnnotationValue, RcStr,
 };
 use serde_json::Value;
 
@@ -17,8 +17,7 @@ pub fn translate_annotation(v: &Value) -> Annotation<RcStr> {
 }
 
 pub fn translate_annotation_property(v: &Value) -> AnnotationProperty<RcStr> {
-    let b = Build::new();
-    b.annotation_property(extract_iri_str(v))
+    build().annotation_property(extract_iri_str(v))
 }
 
 pub fn translate_annotation_value(v: &Value) -> AnnotationValue<RcStr> {
@@ -26,8 +25,7 @@ pub fn translate_annotation_value(v: &Value) -> AnnotationValue<RcStr> {
         let value = expression_transducer::translate_literal(v);
         AnnotationValue::Literal(value)
     } else {
-        let b = Build::new();
-        let iri = b.iri(extract_iri_str(v));
+        let iri = build().iri(extract_iri_str(v));
         AnnotationValue::IRI(iri)
     }
 }
@@ -37,8 +35,7 @@ pub fn translate_annotation_subject(v: &Value) -> AnnotationSubject<RcStr> {
         let individual = expression_transducer::translate_anonymous_individual(v);
         AnnotationSubject::AnonymousIndividual(individual)
     } else {
-        let b = Build::new();
-        let iri = b.iri(extract_iri_str(v));
+        let iri = build().iri(extract_iri_str(v));
         AnnotationSubject::IRI(iri)
     }
 }

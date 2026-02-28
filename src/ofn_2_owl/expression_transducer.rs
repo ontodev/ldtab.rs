@@ -3,10 +3,10 @@ use regex::Regex;
 use serde_json::Value;
 use std::rc::Rc;
 //use std::sync::Arc;
-use crate::ofn_2_owl::util::extract_iri_str;
+use crate::ofn_2_owl::util::{build, default_class_filler, default_data_filler, extract_iri_str};
 use horned_owl::model::{
-    AnonymousIndividual, Build, ClassExpression, DataProperty, DataRange, Datatype, Individual,
-    Literal, ObjectPropertyExpression, RcStr, SubObjectPropertyExpression,
+    AnonymousIndividual, ClassExpression, DataProperty, DataRange, Datatype, Individual, Literal,
+    ObjectPropertyExpression, RcStr, SubObjectPropertyExpression,
 };
 
 static SIMPLE_LITERAL_RE: Lazy<Regex> = Lazy::new(|| Regex::new("(?s)^\"(.*)\"$").unwrap());
@@ -92,7 +92,7 @@ pub fn translate_class_expression(v: &Value) -> ClassExpression<RcStr> {
 }
 
 pub fn translate_literal_string(s: &str) -> Literal<RcStr> {
-    let b = Build::new();
+    let b = build();
 
     if LANGUAGE_TAG_RE.is_match(s) {
         match LANGUAGE_TAG_RE.captures(s) {
@@ -182,34 +182,28 @@ pub fn translate_data_union_of(v: &Value) -> DataRange<RcStr> {
 }
 
 pub fn translate_datatype(v: &Value) -> Datatype<RcStr> {
-    let b = Build::new();
-    b.datatype(extract_iri_str(v)).into()
+    build().datatype(extract_iri_str(v)).into()
 }
 
 pub fn translate_datatype_as_range(v: &Value) -> DataRange<RcStr> {
-    let b = Build::new();
-    DataRange::Datatype(b.datatype(extract_iri_str(v)))
+    DataRange::Datatype(build().datatype(extract_iri_str(v)))
 }
 
 pub fn translate_named_object_property(v: &Value) -> ObjectPropertyExpression<RcStr> {
-    let b = Build::new();
-    b.object_property(extract_iri_str(v)).into()
+    build().object_property(extract_iri_str(v)).into()
 }
 
 pub fn translate_data_property(v: &Value) -> DataProperty<RcStr> {
-    let b = Build::new();
-    b.data_property(extract_iri_str(v)).into()
+    build().data_property(extract_iri_str(v)).into()
 }
 
 pub fn translate_inverse_of(v: &Value) -> ObjectPropertyExpression<RcStr> {
-    let b = Build::new();
-    let argument = b.object_property(extract_iri_str(&v[1])).into();
+    let argument = build().object_property(extract_iri_str(&v[1])).into();
     ObjectPropertyExpression::InverseObjectProperty { 0: argument }
 }
 
 pub fn translate_named_class(v: &Value) -> ClassExpression<RcStr> {
-    let b = Build::new();
-    b.class(extract_iri_str(v)).into()
+    build().class(extract_iri_str(v)).into()
 }
 
 pub fn translate_anonymous_individual(v: &Value) -> AnonymousIndividual<RcStr> {
@@ -219,8 +213,7 @@ pub fn translate_anonymous_individual(v: &Value) -> AnonymousIndividual<RcStr> {
 
 pub fn translate_individual(v: &Value) -> Individual<RcStr> {
     //TODO: handle anonymous individuals
-    let b = Build::new();
-    b.named_individual(extract_iri_str(v)).into()
+    build().named_individual(extract_iri_str(v)).into()
 }
 
 pub fn translate_object_some_values_from(v: &Value) -> ClassExpression<RcStr> {
@@ -254,8 +247,6 @@ pub fn translate_object_has_value(v: &Value) -> ClassExpression<RcStr> {
 }
 
 pub fn translate_object_min_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let b = Build::new();
-
     let cardinality = match v[1].clone() {
         Value::String(x) => {
             let num: i32 = x.parse().unwrap();
@@ -272,7 +263,7 @@ pub fn translate_object_min_cardinality(v: &Value) -> ClassExpression<RcStr> {
     let filler = if is_qualified {
         translate_class_expression(&v[3])
     } else {
-        b.class("http://www.w3.org/2002/07/owl#Thing").into()
+        default_class_filler()
     };
 
     //let filler: ClassExpression = b.class("http://www.w3.org/2002/07/owl#Thing").into();
@@ -304,8 +295,6 @@ pub fn translate_object_min_qualified_cardinality(v: &Value) -> ClassExpression<
 }
 
 pub fn translate_object_max_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let b = Build::new();
-
     let cardinality = match v[1].clone() {
         Value::String(x) => {
             let num: i32 = x.parse().unwrap();
@@ -322,7 +311,7 @@ pub fn translate_object_max_cardinality(v: &Value) -> ClassExpression<RcStr> {
     let filler = if is_qualified {
         translate_class_expression(&v[3])
     } else {
-        b.class("http://www.w3.org/2002/07/owl#Thing").into()
+        default_class_filler()
     };
 
     //let filler: ClassExpression = b.class("http://www.w3.org/2002/07/owl#Thing").into();
@@ -354,8 +343,6 @@ pub fn translate_object_max_qualified_cardinality(v: &Value) -> ClassExpression<
 }
 
 pub fn translate_object_exact_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let b = Build::new();
-
     let cardinality = match v[1].clone() {
         Value::String(x) => {
             let num: i32 = x.parse().unwrap();
@@ -372,7 +359,7 @@ pub fn translate_object_exact_cardinality(v: &Value) -> ClassExpression<RcStr> {
     let filler = if is_qualified {
         translate_class_expression(&v[3])
     } else {
-        b.class("http://www.w3.org/2002/07/owl#Thing").into()
+        default_class_filler()
     };
 
     //let filler: ClassExpression = b.class("http://www.w3.org/2002/07/owl#Thing").into();
@@ -472,8 +459,6 @@ pub fn translate_data_has_value(v: &Value) -> ClassExpression<RcStr> {
 }
 
 pub fn translate_data_min_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let b = Build::new();
-
     let cardinality = match v[1].clone() {
         Value::Number(x) => match x.as_u64() {
             Some(y) => y,
@@ -490,7 +475,7 @@ pub fn translate_data_min_cardinality(v: &Value) -> ClassExpression<RcStr> {
     let filler = if is_qualified {
         translate_data_range(&v[3])
     } else {
-        DataRange::Datatype(b.datatype("rdfs:Literal"))
+        default_data_filler()
     };
 
     //let filler: DataRange = DataRange::Datatype(b.datatype("rdfs:Literal"));
@@ -522,8 +507,6 @@ pub fn translate_data_min_qualified_cardinality(v: &Value) -> ClassExpression<Rc
 }
 
 pub fn translate_data_max_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let b = Build::new();
-
     let cardinality = match v[1].clone() {
         Value::Number(x) => match x.as_u64() {
             Some(y) => y,
@@ -533,7 +516,6 @@ pub fn translate_data_max_cardinality(v: &Value) -> ClassExpression<RcStr> {
     };
 
     let property = translate_data_property(&v[2]);
-    //let filler: DataRange = DataRange::Datatype(b.datatype("rdfs:Literal"));
 
     let ofn = v.as_array().unwrap();
     let is_qualified = ofn.len() == 4;
@@ -541,7 +523,7 @@ pub fn translate_data_max_cardinality(v: &Value) -> ClassExpression<RcStr> {
     let filler = if is_qualified {
         translate_data_range(&v[3])
     } else {
-        DataRange::Datatype(b.datatype("rdfs:Literal"))
+        default_data_filler()
     };
 
     ClassExpression::DataMaxCardinality {
@@ -571,8 +553,6 @@ pub fn translate_data_max_qualified_cardinality(v: &Value) -> ClassExpression<Rc
 }
 
 pub fn translate_data_exact_cardinality(v: &Value) -> ClassExpression<RcStr> {
-    let b = Build::new();
-
     let cardinality = match v[1].clone() {
         Value::Number(x) => match x.as_u64() {
             Some(y) => y,
@@ -585,11 +565,10 @@ pub fn translate_data_exact_cardinality(v: &Value) -> ClassExpression<RcStr> {
 
     let ofn = v.as_array().unwrap();
     let is_qualified = ofn.len() == 4;
-    //let filler: DataRange = DataRange::Datatype(b.datatype("rdfs:Literal"));
     let filler = if is_qualified {
         translate_data_range(&v[3])
     } else {
-        DataRange::Datatype(b.datatype("rdfs:Literal"))
+        default_data_filler()
     };
 
     ClassExpression::DataExactCardinality {
