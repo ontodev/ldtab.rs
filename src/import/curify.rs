@@ -4,9 +4,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 
-use super::triple::{
-    parse_json_from_string, LdTabJsonBuilder, LdTabTriple, DATATYPE_JSONLIST, DATATYPE_JSONMAP,
-};
+use super::triple::LdTabTriple;
 
 pub(crate) static DATATYPE_LITERAL_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"^"(?s)(.*)"\^\^(.*)$"#).unwrap());
@@ -18,36 +16,26 @@ pub(crate) fn curify_triples(
     triples
         .iter()
         .map(|t| {
-            let o = if t.datatype == DATATYPE_JSONMAP || t.datatype == DATATYPE_JSONLIST {
-                parse_json_from_string(&t.object)
-            } else {
-                Value::String(t.object.clone())
-            };
-
-            let annotation = parse_json_from_string(&t.annotation);
-
-            let ldtab = LdTabJsonBuilder::new(
-                t.subject.clone(),
-                t.predicate.clone(),
-                o,
-                &t.datatype,
-            )
-            .graph(&t.graph)
-            .annotation(annotation)
-            .build();
-
-            let ldtab_curified = curify_ldtab_with(&ldtab, prefix_map);
-            super::triple::ldtab_2_triple(&ldtab_curified).unwrap()
+            LdTabTriple {
+                assertion: t.assertion,
+                retraction: t.retraction,
+                graph: t.graph.clone(),
+                subject: curify_value(&t.subject, prefix_map),
+                predicate: curify_value(&t.predicate, prefix_map),
+                object: curify_value(&t.object, prefix_map),
+                datatype: curify_value(&t.datatype, prefix_map),
+                annotation: curify_value(&t.annotation, prefix_map),
+            }
         })
         .collect()
 }
 
-pub(crate) fn curify_ldtab_with(ldtab: &Value, iri2prefix: &HashMap<String, String>) -> Value {
+fn curify_value(ldtab: &Value, iri2prefix: &HashMap<String, String>) -> Value {
     match ldtab {
         Value::Array(vec) => {
             let new_vec: Vec<Value> = vec
                 .iter()
-                .map(|item| curify_ldtab_with(item, iri2prefix))
+                .map(|item| curify_value(item, iri2prefix))
                 .collect();
             Value::Array(new_vec)
         }
@@ -55,7 +43,7 @@ pub(crate) fn curify_ldtab_with(ldtab: &Value, iri2prefix: &HashMap<String, Stri
             let mut new_map = serde_json::Map::new();
             for (key, value) in map.iter() {
                 let curified_key = replace_substrings(key, iri2prefix);
-                new_map.insert(curified_key, curify_ldtab_with(value, iri2prefix));
+                new_map.insert(curified_key, curify_value(value, iri2prefix));
             }
             Value::Object(new_map)
         }

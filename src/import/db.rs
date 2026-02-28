@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use sqlx::{QueryBuilder, Row, SqlitePool};
 use std::collections::HashMap;
 
-use super::triple::LdTabTriple;
+use super::triple::{value_to_db_string, LdTabTriple};
 
 const SQLITE_MAX_VARIABLE_NUMBER: usize = 999;
 const NUM_COLUMNS: usize = 8;
@@ -43,11 +43,11 @@ pub(crate) async fn insert_triples_to_db(triples: &[LdTabTriple], pool: &SqliteP
             b.push_bind(triple.assertion)
                 .push_bind(triple.retraction)
                 .push_bind(&triple.graph)
-                .push_bind(&triple.subject)
-                .push_bind(&triple.predicate)
-                .push_bind(&triple.object)
-                .push_bind(&triple.datatype)
-                .push_bind(&triple.annotation);
+                .push_bind(value_to_db_string(&triple.subject))
+                .push_bind(value_to_db_string(&triple.predicate))
+                .push_bind(value_to_db_string(&triple.object))
+                .push_bind(value_to_db_string(&triple.datatype))
+                .push_bind(value_to_db_string(&triple.annotation));
         });
 
         query_builder
