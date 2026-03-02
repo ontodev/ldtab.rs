@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use crate::ofn_2_owl::annotation_transducer;
 use crate::ofn_2_owl::axiom_transducer;
 use horned_owl::model::{AnnotatedComponent, ArcStr};
@@ -15,18 +16,18 @@ use std::collections::BTreeSet;
 ///
 /// println!("{:?}", axiom);
 
-pub fn translate(ofn: &Value) -> AnnotatedComponent<ArcStr> {
+pub fn translate(ofn: &Value) -> Result<AnnotatedComponent<ArcStr>> {
     //split logic from annotation
-    let owl = get_owl(ofn);
-    let annotations = get_annotations(ofn);
+    let owl = get_owl(ofn)?;
+    let annotations = get_annotations(ofn)?;
 
     //translate logical component
-    let axiom = axiom_transducer::translate_axiom(&owl);
+    let axiom = axiom_transducer::translate_axiom(&owl)?;
 
     //translate annotation component
     let mut annotation_set = BTreeSet::new();
     for annotation in annotations {
-        let ann = annotation_transducer::translate_annotation(&annotation);
+        let ann = annotation_transducer::translate_annotation(&annotation)?;
         annotation_set.insert(ann);
     }
 
@@ -36,30 +37,30 @@ pub fn translate(ofn: &Value) -> AnnotatedComponent<ArcStr> {
         ann: annotation_set,
     };
 
-    annotated_axiom
+    Ok(annotated_axiom)
 }
 
 //TODO: reuse wiring (ofn2ldtab/annotation_translation)
-pub fn get_owl(ofn: &Value) -> Value {
+pub fn get_owl(ofn: &Value) -> Result<Value> {
     let res: Vec<Value> = ofn
         .as_array()
-        .unwrap()
+        .context("Expected OFN S-expression to be a JSON array")?
         .iter()
         .filter(|e| !is_annotation(e))
         .cloned()
         .collect();
-    Value::Array(res)
+    Ok(Value::Array(res))
 }
 
 pub fn is_annotation(v: &Value) -> bool {
     matches!(v, Value::Array(x) if x[0].as_str() == Some("Annotation"))
 }
 
-pub fn get_annotations(ofn: &Value) -> Vec<Value> {
-    ofn.as_array()
-        .unwrap()
+pub fn get_annotations(ofn: &Value) -> Result<Vec<Value>> {
+    Ok(ofn.as_array()
+        .context("Expected OFN S-expression to be a JSON array")?
         .iter()
         .filter(|e| is_annotation(e))
         .cloned()
-        .collect()
+        .collect())
 }

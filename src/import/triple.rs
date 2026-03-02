@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use serde_json::Value;
 
 // LDTab datatypes
@@ -46,7 +47,7 @@ impl LdTabTriple {
 }
 
 /// Parse a JSON thick-triple (from wiring_rs) into an LdTabTriple.
-pub(crate) fn ldtab_2_triple(value: &Value) -> LdTabTriple {
+pub(crate) fn ldtab_2_triple(value: &Value) -> Result<LdTabTriple> {
     let assertion = value
         .get("assertion")
         .and_then(|v| v.as_str())
@@ -63,13 +64,25 @@ pub(crate) fn ldtab_2_triple(value: &Value) -> LdTabTriple {
         .and_then(|v| v.as_str())
         .unwrap_or(DEFAULT_GRAPH)
         .to_string();
-    let subject = value.get("subject").cloned().unwrap_or(Value::Null);
-    let predicate = value.get("predicate").cloned().unwrap_or(Value::Null);
-    let object = value.get("object").cloned().unwrap_or(Value::Null);
-    let datatype = value.get("datatype").cloned().unwrap_or(Value::Null);
+    let subject = value
+        .get("subject")
+        .cloned()
+        .context("Thick triple missing 'subject' field")?;
+    let predicate = value
+        .get("predicate")
+        .cloned()
+        .context("Thick triple missing 'predicate' field")?;
+    let object = value
+        .get("object")
+        .cloned()
+        .context("Thick triple missing 'object' field")?;
+    let datatype = value
+        .get("datatype")
+        .cloned()
+        .context("Thick triple missing 'datatype' field")?;
     let annotation = get_annotation(value);
 
-    LdTabTriple {
+    Ok(LdTabTriple {
         assertion,
         retraction,
         graph,
@@ -78,7 +91,7 @@ pub(crate) fn ldtab_2_triple(value: &Value) -> LdTabTriple {
         object,
         datatype,
         annotation,
-    }
+    })
 }
 
 pub fn is_ldtab_blanknode(input: &Value) -> bool {
@@ -93,18 +106,17 @@ pub(crate) fn extract_value_and_datatype(value: &Value, default_datatype: &Value
         Value::String(_) => (value.clone(), default_datatype.clone()),
         Value::Array(a) if !a.is_empty() => {
             if let Some(x) = a[0].as_object() {
-                if x.contains_key("datatype") {
-                    let datatype = x.get("datatype").unwrap().clone();
-                    let obj = x.get("object").unwrap().clone();
-                    return (obj, datatype);
+                if let (Some(datatype), Some(obj)) = (x.get("datatype"), x.get("object")) {
+                    return (obj.clone(), datatype.clone());
                 }
             }
             (value.clone(), default_datatype.clone())
         }
         Value::Object(x) => {
-            if x.contains_key("datatype") && x.get("datatype").unwrap().as_str() == Some(DATATYPE_IRI) {
-                let obj = x.get("object").unwrap().clone();
-                return (obj, Value::String(DATATYPE_IRI.to_string()));
+            if x.get("datatype").and_then(|v| v.as_str()) == Some(DATATYPE_IRI) {
+                if let Some(obj) = x.get("object") {
+                    return (obj.clone(), Value::String(DATATYPE_IRI.to_string()));
+                }
             }
             (value.clone(), default_datatype.clone())
         }

@@ -57,14 +57,14 @@ pub async fn import(sub_matches: &ArgMatches) -> Result<()> {
             import_ontology(&ontology, &pool).await?;
         }
         Err(e) => {
-            eprintln!("Failed to read ontology: {:?}", e);
+            anyhow::bail!("Failed to read ontology: {:?}", e);
         }
     }
     Ok(())
 }
 
 async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> Result<()> {
-    let iri_value = extract_ontology_iri(ontology);
+    let iri_value = extract_ontology_iri(ontology)?;
     let prefix_map = load_prefix_map(pool).await?;
     let prefix2iri = invert_prefix_map(&prefix_map);
 
@@ -78,10 +78,10 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
 
     // Process axiom types into triples
     let mut ldtab_triples = process_normal_axioms(&normal);
-    ldtab_triples.extend(process_ontology_id(&ontology_id));
-    ldtab_triples.extend(process_imports(&imports, &iri_value));
-    ldtab_triples.extend(process_ontology_annotations(&ontology_annotations, &iri_value));
-    ldtab_triples.extend(process_swrl_rules(&dl_safe_rules, &prefix2iri));
+    ldtab_triples.extend(process_ontology_id(&ontology_id)?);
+    ldtab_triples.extend(process_imports(&imports, &iri_value)?);
+    ldtab_triples.extend(process_ontology_annotations(&ontology_annotations, &iri_value)?);
+    ldtab_triples.extend(process_swrl_rules(&dl_safe_rules, &prefix2iri)?);
 
     // Handle blank nodes
     let ldtab_triples = process_blank_nodes(&ldtab_triples, &prefix2iri);
@@ -101,12 +101,19 @@ async fn import_ontology(ontology: &SetOntology<ArcStr>, pool: &SqlitePool) -> R
     Ok(())
 }
 
-fn extract_ontology_iri(ontology: &SetOntology<ArcStr>) -> Value {
+fn extract_ontology_iri(ontology: &SetOntology<ArcStr>) -> Result<Value> {
     let id = ontology.i();
-    let i = id.clone().the_ontology_id().unwrap().iri.unwrap();
-    let ii = i.get(0..);
-    let iri = "<".to_string() + ii.unwrap() + ">";
-    Value::String(String::from(iri))
+    let ont_id = id
+        .clone()
+        .the_ontology_id()
+        .context("Ontology has no OntologyID component")?;
+    let iri = ont_id
+        .iri
+        .context("Ontology has no IRI")?;
+    let iri_str = iri
+        .get(0..)
+        .context("Failed to extract IRI string")?;
+    Ok(Value::String(format!("<{}>", iri_str)))
 }
 
 fn split_ontology_components<'a>(
@@ -143,11 +150,17 @@ fn process_normal_axioms(
 ) -> Vec<LdTabTriple> {
     normal
         .par_iter()
-        .map(|ann_axiom| owl_2_ldtab(ann_axiom))
+        .filter_map(|ann_axiom| match owl_2_ldtab(ann_axiom) {
+            Ok(t) => Some(t),
+            Err(e) => {
+                eprintln!("Skipping axiom: {e:#}");
+                None
+            }
+        })
         .collect()
 }
 
-fn process_ontology_id(ontology_id: &[&AnnotatedComponent<ArcStr>]) -> Vec<LdTabTriple> {
+fn process_ontology_id(ontology_id: &[&AnnotatedComponent<ArcStr>]) -> Result<Vec<LdTabTriple>> {
     let mut triples = Vec::new();
 
     for ann_axiom in ontology_id {
@@ -155,24 +168,24 @@ fn process_ontology_id(ontology_id: &[&AnnotatedComponent<ArcStr>]) -> Vec<LdTab
         let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
 
         if ldtab["predicate"] == OWL_VERSION_IRI {
-            let mut t = ldtab_2_triple(&ldtab);
+            let mut t = ldtab_2_triple(&ldtab)?;
             t.predicate = json!(RDF_TYPE);
             t.object = json!(OWL_ONTOLOGY);
             triples.push(t);
         }
 
         if ldtab["object"] != UNKNOWN_VALUE {
-            triples.push(ldtab_2_triple(&ldtab));
+            triples.push(ldtab_2_triple(&ldtab)?);
         }
     }
 
-    triples
+    Ok(triples)
 }
 
 fn process_imports(
     imports: &[&AnnotatedComponent<ArcStr>],
     iri_value: &Value,
-) -> Vec<LdTabTriple> {
+) -> Result<Vec<LdTabTriple>> {
     imports
         .iter()
         .map(|ann_axiom| {
@@ -187,7 +200,7 @@ fn process_imports(
 fn process_ontology_annotations(
     ontology_annotations: &[&AnnotatedComponent<ArcStr>],
     iri_value: &Value,
-) -> Vec<LdTabTriple> {
+) -> Result<Vec<LdTabTriple>> {
     ontology_annotations
         .iter()
         .map(|ann_axiom| {
@@ -202,19 +215,19 @@ fn process_ontology_annotations(
 fn process_swrl_rules(
     dl_safe_rules: &[&AnnotatedComponent<ArcStr>],
     prefix2iri: &HashMap<String, String>,
-) -> Vec<LdTabTriple> {
+) -> Result<Vec<LdTabTriple>> {
     let mut triples = Vec::new();
 
     // Collect all variables from rules
     let variables: HashSet<Variable<ArcStr>> = dl_safe_rules
         .iter()
-        .flat_map(|ann_axiom| {
-            let rule = match &ann_axiom.component {
-                Component::Rule(r) => r,
-                other => panic!("Expected a Rule-component, but found: {:?}", other),
-            };
-            get_rule_variables(rule)
+        .map(|ann_axiom| match &ann_axiom.component {
+            Component::Rule(r) => Ok(get_rule_variables(r)),
+            other => anyhow::bail!("Expected a Rule component, but found: {:?}", other),
         })
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .flatten()
         .collect();
 
     // Create type declarations for variables
@@ -230,10 +243,22 @@ fn process_swrl_rules(
 
         // Build blank node content
         let mut m = Map::new();
-        for triple in ldtab.as_array().unwrap() {
-            let predicate = triple.get("predicate").unwrap().as_str().unwrap();
-            let object = triple.get("object").unwrap();
-            let datatype = triple.get("datatype").unwrap().as_str().unwrap();
+        let triples_array = ldtab
+            .as_array()
+            .context("Expected SWRL rule to produce a JSON array of triples")?;
+
+        for triple in triples_array {
+            let predicate = triple
+                .get("predicate")
+                .and_then(|v| v.as_str())
+                .context("SWRL triple missing 'predicate' string")?;
+            let object = triple
+                .get("object")
+                .context("SWRL triple missing 'object'")?;
+            let datatype = triple
+                .get("datatype")
+                .and_then(|v| v.as_str())
+                .context("SWRL triple missing 'datatype' string")?;
             let ooo = json!([{"datatype": datatype, "object": object}]);
             m.insert(predicate.to_string(), ooo);
         }
@@ -241,19 +266,19 @@ fn process_swrl_rules(
         let blank = Value::Object(m);
         let blank_node = generate_blank_node_id(&blank, prefix2iri);
 
-        for triple in ldtab.as_array().unwrap() {
+        for triple in triples_array {
             let t = LdTabTriple::new(
                 blank_node.clone(),
-                triple.get("predicate").unwrap().clone(),
-                triple.get("object").unwrap().clone(),
-                triple.get("datatype").unwrap().clone(),
+                triple.get("predicate").cloned().unwrap_or(Value::Null),
+                triple.get("object").cloned().unwrap_or(Value::Null),
+                triple.get("datatype").cloned().unwrap_or(Value::Null),
             )
-            .annotation(triple.get("annotation").unwrap().clone());
+            .annotation(triple.get("annotation").cloned().unwrap_or(Value::Null));
             triples.push(t);
         }
     }
 
-    triples
+    Ok(triples)
 }
 
 /// Processes blank nodes in triples, expanding JSON objects as subjects.
@@ -323,10 +348,11 @@ fn process_blank_nodes(
 
 fn owl_2_ldtab(
     ann_axiom: &AnnotatedComponent<ArcStr>,
-) -> LdTabTriple {
+) -> Result<LdTabTriple> {
     let ofn = owl_2_ofn::transducer::translate(ann_axiom);
     let ldtab = wiring_rs::ofn_2_ldtab::translation::ofn_2_thick_triple(&ofn);
     ldtab_2_triple(&ldtab)
+        .context("Failed to convert thick triple to LdTabTriple")
 }
 
 pub fn get_rule_variables<A>(rule: &Rule<A>) -> HashSet<Variable<A>>

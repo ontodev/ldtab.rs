@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde_json::Value;
@@ -30,8 +31,8 @@ pub fn is_literal_string(s: &str) -> bool {
 }
 
 //TODO: check that the string is a valid IRI
-pub fn extract_iri_str(v: &Value) -> &str {
-    v.as_str().expect("Expected an IRI string")
+pub fn extract_iri_str(v: &Value) -> Result<&str> {
+    v.as_str().context("Expected an IRI string")
 }
 
 pub fn build() -> Build<ArcStr> {
@@ -46,13 +47,12 @@ pub fn default_data_filler() -> DataRange<ArcStr> {
     DataRange::Datatype(build().datatype("rdfs:Literal"))
 }
 
-pub fn parse_string_cardinality(v: &Value) -> u32 {
-    v.as_str()
-        .expect("Expected a string for cardinality")
-        .parse::<u32>()
-        .expect("Expected a valid cardinality number")
+pub fn parse_string_cardinality(v: &Value) -> Result<u32> {
+    let s = v.as_str().context("Expected a string for cardinality")?;
+    s.parse::<u32>().context("Expected a valid cardinality number")
 }
 
-pub fn parse_number_cardinality(v: &Value) -> u32 {
-    v.as_u64().expect("Expected a valid cardinality number") as u32
+pub fn parse_number_cardinality(v: &Value) -> Result<u32> {
+    let n = v.as_u64().context("Expected a valid cardinality number")?;
+    Ok(n as u32)
 }
