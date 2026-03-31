@@ -8,9 +8,10 @@ use crate::ofn_2_owl::util::{
     parse_string_cardinality,
 };
 use horned_owl::model::{
-    AnonymousIndividual, ClassExpression, DataProperty, DataRange, Datatype, Individual, Literal,
-    ObjectPropertyExpression, ArcStr, SubObjectPropertyExpression,
+    AnonymousIndividual, ClassExpression, DataProperty, DataRange, Datatype, FacetRestriction,
+    Individual, Literal, ObjectPropertyExpression, ArcStr, SubObjectPropertyExpression,
 };
+use horned_owl::vocab::Facet;
 
 static SIMPLE_LITERAL_RE: Lazy<Regex> = Lazy::new(|| Regex::new("(?s)^\"(.*)\"$").unwrap());
 static LANGUAGE_TAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new("(?s)^\"(.*)\"@(.*)$").unwrap());
@@ -28,11 +29,19 @@ pub fn translate_object_property_expression(v: &Value) -> Result<ObjectPropertyE
 pub fn translate_sub_object_property_expression(v: &Value) -> Result<SubObjectPropertyExpression<ArcStr>> {
     match v {
         Value::Array(array) => {
-            let operands: Vec<ObjectPropertyExpression<ArcStr>> = array[1..]
-                .iter()
-                .map(|x| translate_object_property_expression(x))
-                .collect::<Result<_>>()?;
-            Ok(SubObjectPropertyExpression::ObjectPropertyChain(operands))
+            match array.first().and_then(Value::as_str) {
+                Some("ObjectPropertyChain") => {
+                    let operands: Vec<ObjectPropertyExpression<ArcStr>> = array[1..]
+                        .iter()
+                        .map(|x| translate_object_property_expression(x))
+                        .collect::<Result<_>>()?;
+                    Ok(SubObjectPropertyExpression::ObjectPropertyChain(operands))
+                }
+                _ => {
+                    let property = translate_object_property_expression(v)?;
+                    Ok(SubObjectPropertyExpression::ObjectPropertyExpression(property))
+                }
+            }
         }
         Value::String(_s) => {
             let property = translate_object_property_expression(v)?;
@@ -78,9 +87,13 @@ pub fn translate_literal_string(s: &str) -> Result<Literal<ArcStr>> {
             lang: String::from(&x[2]),
         })
     } else if let Some(x) = DATATYPE_RE.captures(s) {
+        let datatype_iri = x[2]
+            .strip_prefix('<')
+            .and_then(|v| v.strip_suffix('>'))
+            .unwrap_or(&x[2]);
         Ok(Literal::Datatype {
             literal: String::from(&x[1]),
-            datatype_iri: build().iri(&x[2]),
+            datatype_iri: build().iri(datatype_iri),
         })
     } else if let Some(x) = SIMPLE_LITERAL_RE.captures(s) {
         Ok(Literal::Simple {
@@ -108,8 +121,7 @@ pub fn translate_data_range(v: &Value) -> Result<DataRange<ArcStr>> {
                 Some("DataUnionOf") => translate_data_union_of(v),
                 Some("DataComplementOf") => translate_data_complement_of(v),
                 Some("DataOneOf") => translate_data_one_of(v),
-                //TODO
-                //Some("DatatypeRestriction") => translate_object_some_values_from(v),
+                Some("DatatypeRestriction") => translate_datatype_restriction(v),
                 Some(op) => bail!("Not a valid data range operator: {}", op),
                 None => bail!("Expected a data range operator string"),
             }
@@ -150,6 +162,58 @@ pub fn translate_data_union_of(v: &Value) -> Result<DataRange<ArcStr>> {
         .collect::<Result<_>>()?;
 
     Ok(DataRange::DataUnionOf(operands))
+}
+
+fn translate_facet(v: &Value) -> Result<Facet> {
+    match v.as_str() {
+        Some("Length") => Ok(Facet::Length),
+        Some("MinLength") => Ok(Facet::MinLength),
+        Some("MaxLength") => Ok(Facet::MaxLength),
+        Some("Pattern") => Ok(Facet::Pattern),
+        Some("MinInclusive") => Ok(Facet::MinInclusive),
+        Some("MinExclusive") => Ok(Facet::MinExclusive),
+        Some("MaxInclusive") => Ok(Facet::MaxInclusive),
+        Some("MaxExclusive") => Ok(Facet::MaxExclusive),
+        Some("TotalDigits") => Ok(Facet::TotalDigits),
+        Some("FractionDigits") => Ok(Facet::FractionDigits),
+        Some("LangRange") => Ok(Facet::LangRange),
+        Some(other) => bail!("Unknown facet: {}", other),
+        None => bail!("Expected facet name as string"),
+    }
+}
+
+fn translate_facet_restriction(v: &Value) -> Result<FacetRestriction<ArcStr>> {
+    let arr = v
+        .as_array()
+        .context("Expected array for FacetRestriction")?;
+    if arr.first().and_then(Value::as_str) != Some("FacetRestriction") || arr.len() != 3 {
+        bail!("Invalid FacetRestriction form: {}", v);
+    }
+
+    let facet = translate_facet(&arr[1])?;
+    let literal = translate_literal(&arr[2])?;
+
+    Ok(FacetRestriction {
+        f: facet,
+        l: literal,
+    })
+}
+
+pub fn translate_datatype_restriction(v: &Value) -> Result<DataRange<ArcStr>> {
+    let arr = v
+        .as_array()
+        .context("Expected array for DatatypeRestriction")?;
+    if arr.len() < 2 {
+        bail!("DatatypeRestriction requires at least datatype operand");
+    }
+
+    let datatype = translate_datatype(&arr[1])?;
+    let facets: Vec<FacetRestriction<ArcStr>> = arr[2..]
+        .iter()
+        .map(translate_facet_restriction)
+        .collect::<Result<_>>()?;
+
+    Ok(DataRange::DatatypeRestriction(datatype, facets))
 }
 
 pub fn translate_datatype(v: &Value) -> Result<Datatype<ArcStr>> {
