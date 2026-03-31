@@ -1,30 +1,58 @@
-use serde_json::{Value};
+use anyhow::{Context, Result};
+use once_cell::sync::Lazy;
 use regex::Regex;
+use serde_json::Value;
+
+use horned_owl::model::{Build, ClassExpression, DataRange, ArcStr};
+
+static ANONYMOUS_RE: Lazy<Regex> = Lazy::new(|| Regex::new("^(.*)_:(.+)$").unwrap());
+static LITERAL_RE: Lazy<Regex> = Lazy::new(|| Regex::new("(?s)^\"(.*)\"(.*)$").unwrap());
 
 pub fn is_literal(v: &Value) -> bool {
-    match v {
-        Value::String(x) => is_literal_string(x),
-        _ => false 
-    }
-}
-
-pub fn is_anonynous_individual(v : &Value) -> bool {
     match v {
         Value::String(x) => is_literal_string(x),
         _ => false,
     }
 }
 
-pub fn is_anonymous_individual(s : &str) -> bool {
-    let anonymous = Regex::new("^(.*)_:(.+)$").unwrap(); 
-    anonymous.is_match(s)
+pub fn is_anonynous_individual(v: &Value) -> bool {
+    match v {
+        Value::String(x) => is_literal_string(x),
+        _ => false,
+    }
 }
 
-pub fn is_literal_string(s : &str) -> bool {
+pub fn is_anonymous_individual(s: &str) -> bool {
+    ANONYMOUS_RE.is_match(s)
+}
 
-    //NB: "(?s)" sets a flag so that . matches \n 
-    //let literal = Regex::new("^\"(.*)\"(.*)$").unwrap();
-    let literal = Regex::new("(?s)^\"(.*)\"(.*)$").unwrap();
+pub fn is_literal_string(s: &str) -> bool {
+    LITERAL_RE.is_match(s)
+}
 
-    literal.is_match(s) 
+//TODO: check that the string is a valid IRI
+pub fn extract_iri_str(v: &Value) -> Result<&str> {
+    v.as_str().context("Expected an IRI string")
+}
+
+pub fn build() -> Build<ArcStr> {
+    Build::new()
+}
+
+pub fn default_class_filler() -> ClassExpression<ArcStr> {
+    build().class("http://www.w3.org/2002/07/owl#Thing").into()
+}
+
+pub fn default_data_filler() -> DataRange<ArcStr> {
+    DataRange::Datatype(build().datatype("rdfs:Literal"))
+}
+
+pub fn parse_string_cardinality(v: &Value) -> Result<u32> {
+    let s = v.as_str().context("Expected a string for cardinality")?;
+    s.parse::<u32>().context("Expected a valid cardinality number")
+}
+
+pub fn parse_number_cardinality(v: &Value) -> Result<u32> {
+    let n = v.as_u64().context("Expected a valid cardinality number")?;
+    Ok(n as u32)
 }

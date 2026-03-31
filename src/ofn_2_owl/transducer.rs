@@ -1,9 +1,9 @@
-use serde_json::{Value};
-use crate::ofn_2_owl::axiom_transducer as axiom_transducer;
-use crate::ofn_2_owl::annotation_transducer as annotation_transducer;
-use horned_owl::model::{AnnotatedAxiom, RcStr};
+use anyhow::{Context, Result};
+use crate::ofn_2_owl::annotation_transducer;
+use crate::ofn_2_owl::axiom_transducer;
+use horned_owl::model::{AnnotatedComponent, ArcStr};
+use serde_json::Value;
 use std::collections::BTreeSet;
-
 
 /// Given an OFN S-expression encoding an OWL axiom,
 /// return it's representation in Horned OWL
@@ -14,79 +14,53 @@ use std::collections::BTreeSet;
 /// let ofn = json!(ofn);
 /// let axiom = ofn_2_owl::transducer::translate(&ofn);
 ///
-/// println!("{:?}", axiom); 
+/// println!("{:?}", axiom);
 
-pub fn translate(ofn : &Value) -> AnnotatedAxiom<RcStr> {
-
+pub fn translate(ofn: &Value) -> Result<AnnotatedComponent<ArcStr>> {
     //split logic from annotation
-    let owl = get_owl(ofn);
-    let annotations = get_annotations(ofn);
+    let owl = get_owl(ofn)?;
+    let annotations = get_annotations(ofn)?;
 
     //translate logical component
-    let axiom = axiom_transducer::translate_axiom(&owl);
+    let axiom = axiom_transducer::translate_axiom(&owl)?;
 
     //translate annotation component
     let mut annotation_set = BTreeSet::new();
     for annotation in annotations {
-        let ann = annotation_transducer::translate_annotation(&annotation);
+        let ann = annotation_transducer::translate_annotation(&annotation)?;
         annotation_set.insert(ann);
     }
 
     //merge logical and annotation component
-    let annotated_axiom = AnnotatedAxiom{axiom : axiom,
-                                         ann: annotation_set};
+    let annotated_axiom = AnnotatedComponent {
+        component: axiom,
+        ann: annotation_set,
+    };
 
-    annotated_axiom 
+    Ok(annotated_axiom)
 }
-
-
 
 //TODO: reuse wiring (ofn2ldtab/annotation_translation)
-pub fn get_owl(ofn : &Value) -> Value {
-
-    let mut res = Vec::new();
-    let original = &ofn.as_array().unwrap()[0..];
-    for element in original { 
-        if !is_annotation(element){
-            res.push(element.clone());
-        } 
-    } 
-    Value::Array(res) 
+pub fn get_owl(ofn: &Value) -> Result<Value> {
+    let res: Vec<Value> = ofn
+        .as_array()
+        .context("Expected OFN S-expression to be a JSON array")?
+        .iter()
+        .filter(|e| !is_annotation(e))
+        .cloned()
+        .collect();
+    Ok(Value::Array(res))
 }
 
-pub fn is_annotation(v : &Value) -> bool { 
-    match v.clone() { 
-        Value::Array(x) => { 
-            match x[0].as_str(){
-                Some("Annotation") => true,
-                Some(_) => false,
-                None => false, 
-            }
-        }
-        _ => false,
-    }
+pub fn is_annotation(v: &Value) -> bool {
+    matches!(v, Value::Array(x) if x[0].as_str() == Some("Annotation"))
 }
 
-pub fn has_annotation(v : &Value) -> bool { 
-    match v.clone() {
-        Value::Array(x) => is_annotation(&x[1]), //look into second argument
-        _ => false,
-    } 
-}
-
-pub fn get_annotations(ofn : &Value) -> Vec<Value> {
-
-    if has_annotation(&ofn) {
-
-        let mut res = Vec::new();
-        let candidates = &ofn.as_array().unwrap()[0..];
-        for candidate in candidates  {
-            if is_annotation(candidate){
-                res.push(candidate.clone());
-            } 
-        }
-        res
-    } else {
-        Vec::new()//empty vector
-    } 
+pub fn get_annotations(ofn: &Value) -> Result<Vec<Value>> {
+    Ok(ofn.as_array()
+        .context("Expected OFN S-expression to be a JSON array")?
+        .iter()
+        .filter(|e| is_annotation(e))
+        .cloned()
+        .collect())
 }

@@ -1,64 +1,71 @@
 name: Create artifacts
 
 on:
-    [push]
+  push:
+
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-binaries:
+  build:
     strategy:
+      fail-fast: false
       matrix:
-        target: [
-          { runner: "macos-11", arch: "x86_64-apple-darwin" },
-          { runner: "macos-11", arch: "aarch64-apple-darwin" },
-          { runner: "windows-2022", arch: "x86_64-pc-windows-msvc" },
-          { runner: "ubuntu-20.04", arch: "x86_64-unknown-linux-gnu" },
-          { runner: "ubuntu-20.04", arch: "x86_64-unknown-linux-musl" },
-        ]
-    runs-on: ${{ matrix.target.runner }}
+        include:
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            ext: ""
+          - os: macos-15
+            target: aarch64-apple-darwin
+            ext: ""
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            ext: ".exe"
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            ext: ""
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+            ext: ""
+            use_cross: true
+
+    runs-on: ${{ matrix.os }}
+
     steps:
-      - name: Check out repository code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v6
 
-      - name: Install musl-tools (MUSL)
-        if: ${{ matrix.target.runner == 'ubuntu-20.04' && matrix.target.arch == 'x86_64-unknown-linux-musl' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install musl-tools
-
-      - name: Install latest rust toolchain
-        uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          target: ${{ matrix.target.arch }}
-          default: true
-          override: true
+          targets: ${{ matrix.target }}
 
-      - name: Build binary using cross (Linux)
-        if: ${{ matrix.target.runner == 'ubuntu-20.04' }}
-        run: |
-          cargo install cross --git https://github.com/cross-rs/cross
-          sudo systemctl start docker
-          cross build --release --target ${{ matrix.target.arch }}
-          cp target/${{ matrix.target.arch }}/release/ldtab ldtab-${{ matrix.target.arch }}
+      - uses: Swatinem/rust-cache@v2
 
-      - name: Build binary using cargo (MacOS)
-        if: ${{ matrix.target.runner == 'macos-11' }}
-        run: |
-          cargo build --release --target ${{ matrix.target.arch }}
-          cp target/${{ matrix.target.arch }}/release/ldtab ldtab-${{ matrix.target.arch }}
-
-      - name: Build binary using cargo (Windows)
-        if: ${{ matrix.target.runner == 'windows-2022' }}
-        run: |
-          cargo build --release --target ${{ matrix.target.arch }}
-          cp target\${{ matrix.target.arch }}\release\ldtab.exe ldtab-${{ matrix.target.arch }}.exe 
-
-      - name: Upload binary artifacts
-        uses: actions/upload-artifact@v3
+      - name: Install cross (MUSL only)
+        if: ${{ matrix.use_cross }}
+        uses: taiki-e/install-action@v2
         with:
-          name: ${{ matrix.target.arch }}-bin
-          path: ldtab-${{ matrix.target.arch }}
+          tool: cross
+
+      - name: Build + package
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          if [[ "${{ matrix.use_cross }}" == "true" ]]; then
+            cross build --release --target "${{ matrix.target }}"
+          else
+            cargo build --release --target "${{ matrix.target }}"
+          fi
+
+          mkdir -p dist
+          cp "target/${{ matrix.target }}/release/ldtab${{ matrix.ext }}" \
+             "dist/ldtab-${{ matrix.target }}${{ matrix.ext }}"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.target }}-bin
+          path: dist/ldtab-${{ matrix.target }}${{ matrix.ext }}
           if-no-files-found: error

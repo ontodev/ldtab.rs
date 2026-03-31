@@ -1,891 +1,782 @@
-use horned_owl::model::{Build, Axiom, SubClassOf, ClassExpression, EquivalentClasses, DisjointClasses, DisjointUnion, DeclareClass, DeclareObjectProperty, DeclareAnnotationProperty, DeclareDataProperty, DeclareNamedIndividual, DeclareDatatype, SubObjectPropertyOf, SubObjectPropertyExpression, EquivalentObjectProperties, InverseObjectProperties, ObjectPropertyDomain, ObjectPropertyRange, FunctionalObjectProperty, InverseFunctionalObjectProperty, ReflexiveObjectProperty, IrreflexiveObjectProperty, SymmetricObjectProperty, AsymmetricObjectProperty, TransitiveObjectProperty, SubDataPropertyOf, EquivalentDataProperties, DisjointDataProperties, DataPropertyDomain, DataPropertyRange, DataRange, FunctionalDataProperty, DatatypeDefinition, SameIndividual, DifferentIndividuals, ClassAssertion, ObjectPropertyAssertion, NegativeObjectPropertyAssertion, DataPropertyAssertion, Literal, NegativeDataPropertyAssertion, AnnotationAssertion, Annotation, AnnotationValue, AnnotationSubject, SubAnnotationPropertyOf, AnnotationPropertyDomain, AnnotationPropertyRange};
-use serde_json::json; 
-use ldtab_rs::owl2ofn::axiom_transducer as axiom_transducer;
+use anyhow::{Context, Result};
+use horned_owl::model::{
+    AnnotatedComponent, Annotation, AnnotationAssertion, AnnotationPropertyDomain,
+    AnnotationPropertyRange, AnnotationSubject, AnnotationValue, ArcStr, AsymmetricObjectProperty,
+    Build, ClassAssertion, ClassExpression, Component, DataPropertyAssertion, DataPropertyDomain,
+    DataPropertyRange, DataRange, DatatypeDefinition, DeclareAnnotationProperty, DeclareClass,
+    DeclareDataProperty, DeclareDatatype, DeclareNamedIndividual, DeclareObjectProperty,
+    DifferentIndividuals, DisjointClasses, DisjointDataProperties, DisjointObjectProperties,
+    DisjointUnion, DocIRI, EquivalentClasses, EquivalentDataProperties, EquivalentObjectProperties,
+    FacetRestriction, FunctionalDataProperty, FunctionalObjectProperty, HasKey, Import,
+    InverseFunctionalObjectProperty, InverseObjectProperties, IrreflexiveObjectProperty, Literal,
+    NegativeDataPropertyAssertion, NegativeObjectPropertyAssertion, ObjectPropertyAssertion,
+    ObjectPropertyDomain, ObjectPropertyExpression, ObjectPropertyRange, OntologyAnnotation,
+    OntologyID, PropertyExpression, ReflexiveObjectProperty, SameIndividual, SubAnnotationPropertyOf,
+    SubClassOf, SubDataPropertyOf, SubObjectPropertyExpression, SubObjectPropertyOf,
+    SymmetricObjectProperty, TransitiveObjectProperty,
+};
+use horned_owl::vocab::Facet;
+use std::collections::BTreeSet;
 
-//setup horned OWL axiom
-//translate it to OFN S-expression
+fn assert_roundtrip(axiom: AnnotatedComponent<ArcStr>) -> Result<()> {
+    let original_ofn = ldtab_rs::owl_2_ofn::transducer::translate(&axiom);
+    let roundtripped_axiom = ldtab_rs::ofn_2_owl::transducer::translate(&original_ofn)
+        .with_context(|| format!("failed to parse OFN: {original_ofn}"))?;
+    let roundtripped_ofn = ldtab_rs::owl_2_ofn::transducer::translate(&roundtripped_axiom);
 
-///TODO: 
-//HasKey
-//Import
-//OntologyAnnotation 
-//SubObjectPropertyOf with property chains
+    assert_eq!(roundtripped_axiom, axiom);
+    assert_eq!(roundtripped_ofn, original_ofn);
+    Ok(())
+}
 
-#[test]
-fn subclass_of() { 
-    let b = Build::new();
-    let sub = SubClassOf{sub: b.class("http://www.example.com/op1").into(),
-                         sup: b.class("http://www.example.com/op2").into()};
-    let sub_axiom = Axiom::SubClassOf(sub);
+fn plain(component: Component<ArcStr>) -> AnnotatedComponent<ArcStr> {
+    AnnotatedComponent {
+        component,
+        ann: BTreeSet::new(),
+    }
+}
 
-    let sub_ofn = axiom_transducer::translate(&sub_axiom);
-
-    let sub_ofn_expected = json!(["SubClassOf","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(sub_ofn, sub_ofn_expected);
+fn run_cases(cases: Vec<(&'static str, AnnotatedComponent<ArcStr>)>) -> Result<()> {
+    for (name, axiom) in cases {
+        assert_roundtrip(axiom).with_context(|| format!("roundtrip case failed: {name}"))?;
+    }
+    Ok(())
 }
 
 #[test]
-fn equivalence_classes_binary() { 
+fn roundtrip_declaration_axioms() -> Result<()> {
     let b = Build::new();
-    let ec = EquivalentClasses
-          (vec!(b.class("http://www.example.com/op1").into(),
-                b.class("http://www.example.com/op2").into()));
-    let ec_axiom = Axiom::EquivalentClasses(ec); 
-
-    let ec_ofn = axiom_transducer::translate(&ec_axiom);
-
-    let ec_ofn_expected = json!(["EquivalentClasses","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(ec_ofn, ec_ofn_expected);
+    run_cases(vec![
+        (
+            "DeclareClass",
+            plain(Component::DeclareClass(DeclareClass(
+                b.class("http://example.org/C1"),
+            ))),
+        ),
+        (
+            "DeclareObjectProperty",
+            plain(Component::DeclareObjectProperty(DeclareObjectProperty(
+                b.object_property("http://example.org/p1"),
+            ))),
+        ),
+        (
+            "DeclareDataProperty",
+            plain(Component::DeclareDataProperty(DeclareDataProperty(
+                b.data_property("http://example.org/dp1"),
+            ))),
+        ),
+        (
+            "DeclareAnnotationProperty",
+            plain(Component::DeclareAnnotationProperty(DeclareAnnotationProperty(
+                b.annotation_property("http://example.org/ap1"),
+            ))),
+        ),
+        (
+            "DeclareNamedIndividual",
+            plain(Component::DeclareNamedIndividual(DeclareNamedIndividual(
+                b.named_individual("http://example.org/i1"),
+            ))),
+        ),
+        (
+            "DeclareDatatype",
+            plain(Component::DeclareDatatype(DeclareDatatype(
+                b.datatype("http://example.org/dt1"),
+            ))),
+        ),
+    ])
 }
 
 #[test]
-fn equivalence_classes_nary() { 
+fn roundtrip_class_axioms() -> Result<()> {
     let b = Build::new();
-    let ec = EquivalentClasses
-          (vec!(b.class("http://www.example.com/op1").into(),
-                b.class("http://www.example.com/op2").into(),
-                b.class("http://www.example.com/op3").into(),
-                b.class("http://www.example.com/op4").into()));
-    let ec_axiom = Axiom::EquivalentClasses(ec); 
-
-    let ec_ofn = axiom_transducer::translate(&ec_axiom);
-
-    let ec_ofn_expected = json!(["EquivalentClasses","http://www.example.com/op1",
-                                              "http://www.example.com/op2",
-                                              "http://www.example.com/op3",
-                                              "http://www.example.com/op4"]);
-
-    assert_eq!(ec_ofn, ec_ofn_expected);
+    run_cases(vec![
+        (
+            "SubClassOf",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: b.class("http://example.org/C1").into(),
+                sup: b.class("http://example.org/C2").into(),
+            })),
+        ),
+        (
+            "EquivalentClasses",
+            plain(Component::EquivalentClasses(EquivalentClasses(vec![
+                b.class("http://example.org/C1").into(),
+                b.class("http://example.org/C2").into(),
+                b.class("http://example.org/C3").into(),
+            ]))),
+        ),
+        (
+            "DisjointClasses",
+            plain(Component::DisjointClasses(DisjointClasses(vec![
+                b.class("http://example.org/C1").into(),
+                b.class("http://example.org/C2").into(),
+                b.class("http://example.org/C3").into(),
+            ]))),
+        ),
+        (
+            "DisjointUnion",
+            plain(Component::DisjointUnion(DisjointUnion(
+                b.class("http://example.org/C0"),
+                vec![
+                    b.class("http://example.org/C1").into(),
+                    b.class("http://example.org/C2").into(),
+                    b.class("http://example.org/C3").into(),
+                ],
+            ))),
+        ),
+    ])
 }
 
 #[test]
-fn disjoint_classes_binary() { 
+fn roundtrip_object_property_axioms() -> Result<()> {
     let b = Build::new();
-    let dc = DisjointClasses
-          (vec!(b.class("http://www.example.com/op1").into(),
-                b.class("http://www.example.com/op2").into()));
-    let dc_axiom = Axiom::DisjointClasses(dc); 
-
-    let dc_ofn = axiom_transducer::translate(&dc_axiom);
-
-    let dc_ofn_expected = json!(["DisjointClasses","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(dc_ofn, dc_ofn_expected);
+    run_cases(vec![
+        (
+            "SubObjectPropertyOf-simple",
+            plain(Component::SubObjectPropertyOf(SubObjectPropertyOf {
+                sub: SubObjectPropertyExpression::ObjectPropertyExpression(
+                    b.object_property("http://example.org/p1").into(),
+                ),
+                sup: b.object_property("http://example.org/p2").into(),
+            })),
+        ),
+        (
+            "SubObjectPropertyOf-chain",
+            plain(Component::SubObjectPropertyOf(SubObjectPropertyOf {
+                sub: SubObjectPropertyExpression::ObjectPropertyChain(vec![
+                    b.object_property("http://example.org/p1").into(),
+                    b.object_property("http://example.org/p2").into(),
+                ]),
+                sup: b.object_property("http://example.org/p3").into(),
+            })),
+        ),
+        (
+            "SubObjectPropertyOf-inverse-sub",
+            plain(Component::SubObjectPropertyOf(SubObjectPropertyOf {
+                sub: SubObjectPropertyExpression::ObjectPropertyExpression(
+                    ObjectPropertyExpression::InverseObjectProperty(
+                        b.object_property("http://example.org/p1"),
+                    ),
+                ),
+                sup: b.object_property("http://example.org/p2").into(),
+            })),
+        ),
+        (
+            "EquivalentObjectProperties",
+            plain(Component::EquivalentObjectProperties(EquivalentObjectProperties(
+                vec![
+                    b.object_property("http://example.org/p1").into(),
+                    b.object_property("http://example.org/p2").into(),
+                    b.object_property("http://example.org/p3").into(),
+                ],
+            ))),
+        ),
+        (
+            "DisjointObjectProperties",
+            plain(Component::DisjointObjectProperties(DisjointObjectProperties(
+                vec![
+                    b.object_property("http://example.org/p1").into(),
+                    b.object_property("http://example.org/p2").into(),
+                ],
+            ))),
+        ),
+        (
+            "InverseObjectProperties",
+            plain(Component::InverseObjectProperties(InverseObjectProperties(
+                b.object_property("http://example.org/p1"),
+                b.object_property("http://example.org/p2"),
+            ))),
+        ),
+        (
+            "ObjectPropertyDomain",
+            plain(Component::ObjectPropertyDomain(ObjectPropertyDomain {
+                ope: b.object_property("http://example.org/p1").into(),
+                ce: b.class("http://example.org/C1").into(),
+            })),
+        ),
+        (
+            "ObjectPropertyRange",
+            plain(Component::ObjectPropertyRange(ObjectPropertyRange {
+                ope: b.object_property("http://example.org/p1").into(),
+                ce: b.class("http://example.org/C2").into(),
+            })),
+        ),
+        (
+            "FunctionalObjectProperty",
+            plain(Component::FunctionalObjectProperty(FunctionalObjectProperty(
+                b.object_property("http://example.org/p1").into(),
+            ))),
+        ),
+        (
+            "InverseFunctionalObjectProperty",
+            plain(Component::InverseFunctionalObjectProperty(
+                InverseFunctionalObjectProperty(
+                    b.object_property("http://example.org/p1").into(),
+                ),
+            )),
+        ),
+        (
+            "ReflexiveObjectProperty",
+            plain(Component::ReflexiveObjectProperty(ReflexiveObjectProperty(
+                b.object_property("http://example.org/p1").into(),
+            ))),
+        ),
+        (
+            "IrreflexiveObjectProperty",
+            plain(Component::IrreflexiveObjectProperty(IrreflexiveObjectProperty(
+                b.object_property("http://example.org/p1").into(),
+            ))),
+        ),
+        (
+            "SymmetricObjectProperty",
+            plain(Component::SymmetricObjectProperty(SymmetricObjectProperty(
+                b.object_property("http://example.org/p1").into(),
+            ))),
+        ),
+        (
+            "AsymmetricObjectProperty",
+            plain(Component::AsymmetricObjectProperty(AsymmetricObjectProperty(
+                b.object_property("http://example.org/p1").into(),
+            ))),
+        ),
+        (
+            "TransitiveObjectProperty",
+            plain(Component::TransitiveObjectProperty(TransitiveObjectProperty(
+                b.object_property("http://example.org/p1").into(),
+            ))),
+        ),
+    ])
 }
 
 #[test]
-fn disjoint_classes_nary() { 
+fn roundtrip_data_property_axioms() -> Result<()> {
     let b = Build::new();
-    let dc = DisjointClasses
-          (vec!(b.class("http://www.example.com/op1").into(),
-                b.class("http://www.example.com/op2").into(),
-                b.class("http://www.example.com/op3").into(),
-                b.class("http://www.example.com/op4").into()));
-    let dc_axiom = Axiom::DisjointClasses(dc); 
-
-    let dc_ofn = axiom_transducer::translate(&dc_axiom);
-
-    let dc_ofn_expected = json!(["DisjointClasses","http://www.example.com/op1",
-                                              "http://www.example.com/op2",
-                                              "http://www.example.com/op3",
-                                              "http://www.example.com/op4"]);
-
-    assert_eq!(dc_ofn, dc_ofn_expected);
+    run_cases(vec![
+        (
+            "SubDataPropertyOf",
+            plain(Component::SubDataPropertyOf(SubDataPropertyOf {
+                sub: b.data_property("http://example.org/dp1"),
+                sup: b.data_property("http://example.org/dp2"),
+            })),
+        ),
+        (
+            "EquivalentDataProperties",
+            plain(Component::EquivalentDataProperties(EquivalentDataProperties(
+                vec![
+                    b.data_property("http://example.org/dp1"),
+                    b.data_property("http://example.org/dp2"),
+                    b.data_property("http://example.org/dp3"),
+                ],
+            ))),
+        ),
+        (
+            "DisjointDataProperties",
+            plain(Component::DisjointDataProperties(DisjointDataProperties(
+                vec![
+                    b.data_property("http://example.org/dp1"),
+                    b.data_property("http://example.org/dp2"),
+                ],
+            ))),
+        ),
+        (
+            "DataPropertyDomain",
+            plain(Component::DataPropertyDomain(DataPropertyDomain {
+                dp: b.data_property("http://example.org/dp1"),
+                ce: b.class("http://example.org/C1").into(),
+            })),
+        ),
+        (
+            "DataPropertyRange",
+            plain(Component::DataPropertyRange(DataPropertyRange {
+                dp: b.data_property("http://example.org/dp1"),
+                dr: DataRange::Datatype(b.datatype("http://example.org/dt1")),
+            })),
+        ),
+        (
+            "FunctionalDataProperty",
+            plain(Component::FunctionalDataProperty(FunctionalDataProperty(
+                b.data_property("http://example.org/dp1"),
+            ))),
+        ),
+        (
+            "DatatypeDefinition",
+            plain(Component::DatatypeDefinition(DatatypeDefinition {
+                kind: b.datatype("http://example.org/customDatatype"),
+                range: DataRange::DataUnionOf(vec![
+                    DataRange::Datatype(b.datatype(
+                        "http://www.w3.org/2001/XMLSchema#string",
+                    )),
+                    DataRange::Datatype(b.datatype(
+                        "http://www.w3.org/2001/XMLSchema#integer",
+                    )),
+                ]),
+            })),
+        ),
+    ])
 }
 
 #[test]
-fn disjoint_union() { 
+fn roundtrip_assertion_axioms() -> Result<()> {
     let b = Build::new();
-    let du = DisjointUnion{
-        0: b.class("http://www.example.com/op0").into(),
-        1: vec!(b.class("http://www.example.com/op1").into(),
-                b.class("http://www.example.com/op2").into(),
-                b.class("http://www.example.com/op3").into(),
-                b.class("http://www.example.com/op4").into())
-           };
-    let du_axiom = Axiom::DisjointUnion(du); 
-
-    let du_ofn = axiom_transducer::translate(&du_axiom);
-
-    let du_ofn_expected = json!(["DisjointUnion","http://www.example.com/op0", 
-                                              "http://www.example.com/op1",
-                                              "http://www.example.com/op2",
-                                              "http://www.example.com/op3",
-                                              "http://www.example.com/op4"]);
-
-    assert_eq!(du_ofn, du_ofn_expected);
+    run_cases(vec![
+        (
+            "SameIndividual",
+            plain(Component::SameIndividual(SameIndividual(vec![
+                b.named_individual("http://example.org/i1").into(),
+                b.named_individual("http://example.org/i2").into(),
+                b.named_individual("http://example.org/i3").into(),
+            ]))),
+        ),
+        (
+            "DifferentIndividuals",
+            plain(Component::DifferentIndividuals(DifferentIndividuals(vec![
+                b.named_individual("http://example.org/i1").into(),
+                b.named_individual("http://example.org/i2").into(),
+                b.named_individual("http://example.org/i3").into(),
+            ]))),
+        ),
+        (
+            "ClassAssertion",
+            plain(Component::ClassAssertion(ClassAssertion {
+                ce: ClassExpression::ObjectIntersectionOf(vec![
+                    b.class("http://example.org/C1").into(),
+                    b.class("http://example.org/C2").into(),
+                ]),
+                i: b.named_individual("http://example.org/i1").into(),
+            })),
+        ),
+        (
+            "ObjectPropertyAssertion",
+            plain(Component::ObjectPropertyAssertion(ObjectPropertyAssertion {
+                ope: b.object_property("http://example.org/p1").into(),
+                from: b.named_individual("http://example.org/i1").into(),
+                to: b.named_individual("http://example.org/i2").into(),
+            })),
+        ),
+        (
+            "NegativeObjectPropertyAssertion",
+            plain(Component::NegativeObjectPropertyAssertion(
+                NegativeObjectPropertyAssertion {
+                    ope: b.object_property("http://example.org/p1").into(),
+                    from: b.named_individual("http://example.org/i1").into(),
+                    to: b.named_individual("http://example.org/i2").into(),
+                },
+            )),
+        ),
+        (
+            "DataPropertyAssertion-simple-literal",
+            plain(Component::DataPropertyAssertion(DataPropertyAssertion {
+                dp: b.data_property("http://example.org/dp1"),
+                from: b.named_individual("http://example.org/i1").into(),
+                to: Literal::Simple {
+                    literal: "sample".to_string(),
+                },
+            })),
+        ),
+        (
+            "DataPropertyAssertion-language-literal",
+            plain(Component::DataPropertyAssertion(DataPropertyAssertion {
+                dp: b.data_property("http://example.org/dp1"),
+                from: b.named_individual("http://example.org/i1").into(),
+                to: Literal::Language {
+                    literal: "bonjour".to_string(),
+                    lang: "fr".to_string(),
+                },
+            })),
+        ),
+        (
+            "DataPropertyAssertion-typed-literal",
+            plain(Component::DataPropertyAssertion(DataPropertyAssertion {
+                dp: b.data_property("http://example.org/dp1"),
+                from: b.named_individual("http://example.org/i1").into(),
+                to: Literal::Datatype {
+                    literal: "42".to_string(),
+                    datatype_iri: b.iri("http://www.w3.org/2001/XMLSchema#integer"),
+                },
+            })),
+        ),
+        (
+            "NegativeDataPropertyAssertion",
+            plain(Component::NegativeDataPropertyAssertion(
+                NegativeDataPropertyAssertion {
+                    dp: b.data_property("http://example.org/dp1"),
+                    from: b.named_individual("http://example.org/i1").into(),
+                    to: Literal::Datatype {
+                        literal: "0".to_string(),
+                        datatype_iri: b.iri("http://www.w3.org/2001/XMLSchema#integer"),
+                    },
+                },
+            )),
+        ),
+    ])
 }
 
 #[test]
-fn test_class_declaration() { 
+fn roundtrip_annotation_axioms() -> Result<()> {
     let b = Build::new();
-    let dc = DeclareClass{ 0: b.class("http://www.example.com/op1").into() };
-    let dc_axiom = Axiom::DeclareClass(dc); 
+    run_cases(vec![
+        (
+            "AnnotationAssertion-iri-value",
+            plain(Component::AnnotationAssertion(AnnotationAssertion {
+                subject: AnnotationSubject::IRI(b.iri("http://example.org/C1")),
+                ann: Annotation {
+                    ap: b.annotation_property("http://example.org/ap1"),
+                    av: AnnotationValue::IRI(b.iri("http://example.org/reference")),
+                },
+            })),
+        ),
+        (
+            "AnnotationAssertion-literal-value",
+            plain(Component::AnnotationAssertion(AnnotationAssertion {
+                subject: AnnotationSubject::IRI(b.iri("http://example.org/C1")),
+                ann: Annotation {
+                    ap: b.annotation_property("http://example.org/ap1"),
+                    av: AnnotationValue::Literal(Literal::Simple {
+                        literal: "text".to_string(),
+                    }),
+                },
+            })),
+        ),
+        (
+            "SubAnnotationPropertyOf",
+            plain(Component::SubAnnotationPropertyOf(SubAnnotationPropertyOf {
+                sub: b.annotation_property("http://example.org/ap1"),
+                sup: b.annotation_property("http://example.org/ap2"),
+            })),
+        ),
+        (
+            "AnnotationPropertyDomain",
+            plain(Component::AnnotationPropertyDomain(AnnotationPropertyDomain {
+                ap: b.annotation_property("http://example.org/ap1"),
+                iri: b.iri("http://example.org/C1"),
+            })),
+        ),
+        (
+            "AnnotationPropertyRange",
+            plain(Component::AnnotationPropertyRange(AnnotationPropertyRange {
+                ap: b.annotation_property("http://example.org/ap1"),
+                iri: b.iri("http://example.org/C2"),
+            })),
+        ),
+    ])?;
 
-    let dc_ofn = axiom_transducer::translate(&dc_axiom);
+    let mut ann = BTreeSet::new();
+    ann.insert(Annotation {
+        ap: b.annotation_property("http://example.org/ap1"),
+        av: AnnotationValue::IRI(b.iri("http://example.org/reference")),
+    });
+    ann.insert(Annotation {
+        ap: b.annotation_property("http://example.org/ap2"),
+        av: AnnotationValue::Literal(Literal::Language {
+            literal: "hello".to_string(),
+            lang: "en".to_string(),
+        }),
+    });
 
-    let dc_ofn_expected = json!(["Declaration",["Class","http://www.example.com/op1"]]);
-
-    assert_eq!(dc_ofn, dc_ofn_expected);
+    assert_roundtrip(AnnotatedComponent {
+        component: Component::SubClassOf(SubClassOf {
+            sub: b.class("http://example.org/C1").into(),
+            sup: b.class("http://example.org/C2").into(),
+        }),
+        ann,
+    })
 }
 
 #[test]
-fn test_object_property_declaration() { 
+fn roundtrip_metadata_and_key_axioms() -> Result<()> {
     let b = Build::new();
-    let dp = DeclareObjectProperty{ 0: b.object_property("http://www.example.com/op1").into() };
-    let dp_axiom = Axiom::DeclareObjectProperty(dp); 
-
-    let dp_ofn = axiom_transducer::translate(&dp_axiom);
-
-    let dp_ofn_expected = json!(["Declaration",["ObjectProperty","http://www.example.com/op1"]]);
-
-    assert_eq!(dp_ofn, dp_ofn_expected);
+    run_cases(vec![
+        (
+            "Import",
+            plain(Component::Import(Import(
+                b.iri("http://example.org/imported-ontology"),
+            ))),
+        ),
+        (
+            "OntologyID",
+            plain(Component::OntologyID(OntologyID {
+                iri: Some(b.iri("http://example.org/ontology")),
+                viri: Some(b.iri("http://example.org/ontology/1.0.0")),
+            })),
+        ),
+        (
+            "DocIRI",
+            plain(Component::DocIRI(DocIRI(
+                b.iri("http://example.org/ontology.owl"),
+            ))),
+        ),
+        (
+            "OntologyAnnotation",
+            plain(Component::OntologyAnnotation(OntologyAnnotation(Annotation {
+                ap: b.annotation_property("http://example.org/ap1"),
+                av: AnnotationValue::IRI(b.iri("http://example.org/reference")),
+            }))),
+        ),
+        (
+            "HasKey",
+            plain(Component::HasKey(HasKey {
+                ce: b.class("http://example.org/C1").into(),
+                vpe: vec![
+                    PropertyExpression::ObjectPropertyExpression(
+                        b.object_property("http://example.org/p1").into(),
+                    ),
+                    PropertyExpression::DataProperty(
+                        b.data_property("http://example.org/dp1"),
+                    ),
+                ],
+            })),
+        ),
+    ])
 }
 
 #[test]
-fn test_annotation_property_declaration() { 
+fn roundtrip_class_expression_constructors() -> Result<()> {
     let b = Build::new();
-    let ap = DeclareAnnotationProperty{ 0: b.annotation_property("http://www.example.com/op1").into() };
-    let ap_axiom = Axiom::DeclareAnnotationProperty(ap); 
+    let c1 = b.class("http://example.org/C1");
+    let c2 = b.class("http://example.org/C2");
+    let p1 = b.object_property("http://example.org/p1");
+    let i1 = b.named_individual("http://example.org/i1");
+    let i2 = b.named_individual("http://example.org/i2");
+    let dp1 = b.data_property("http://example.org/dp1");
+    let xsd_string = b.datatype("http://www.w3.org/2001/XMLSchema#string");
+    let xsd_integer = b.datatype("http://www.w3.org/2001/XMLSchema#integer");
 
-    let ap_ofn = axiom_transducer::translate(&ap_axiom);
-
-    let ap_ofn_expected = json!(["Declaration",["AnnotationProperty","http://www.example.com/op1"]]);
-
-    assert_eq!(ap_ofn, ap_ofn_expected);
+    run_cases(vec![
+        (
+            "ObjectIntersectionOf",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: c1.clone().into(),
+                sup: ClassExpression::ObjectIntersectionOf(vec![
+                    c1.clone().into(),
+                    c2.clone().into(),
+                ]),
+            })),
+        ),
+        (
+            "ObjectUnionOf",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: c1.clone().into(),
+                sup: ClassExpression::ObjectUnionOf(vec![c1.clone().into(), c2.clone().into()]),
+            })),
+        ),
+        (
+            "ObjectComplementOf",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: c1.clone().into(),
+                sup: ClassExpression::ObjectComplementOf(Box::new(c2.clone().into())),
+            })),
+        ),
+        (
+            "ObjectOneOf",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: c1.clone().into(),
+                sup: ClassExpression::ObjectOneOf(vec![i1.clone().into(), i2.clone().into()]),
+            })),
+        ),
+        (
+            "ObjectSomeValuesFrom",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: c1.clone().into(),
+                sup: ClassExpression::ObjectSomeValuesFrom {
+                    ope: p1.clone().into(),
+                    bce: Box::new(c2.clone().into()),
+                },
+            })),
+        ),
+        (
+            "ObjectAllValuesFrom",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: c1.clone().into(),
+                sup: ClassExpression::ObjectAllValuesFrom {
+                    ope: p1.clone().into(),
+                    bce: Box::new(c2.clone().into()),
+                },
+            })),
+        ),
+        (
+            "ObjectHasValue",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: c1.clone().into(),
+                sup: ClassExpression::ObjectHasValue {
+                    ope: p1.clone().into(),
+                    i: i1.clone().into(),
+                },
+            })),
+        ),
+        (
+            "ObjectHasSelf",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: c1.clone().into(),
+                sup: ClassExpression::ObjectHasSelf(p1.clone().into()),
+            })),
+        ),
+        (
+            "ObjectMinCardinality-qualified",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: c1.clone().into(),
+                sup: ClassExpression::ObjectMinCardinality {
+                    n: 1,
+                    ope: p1.clone().into(),
+                    bce: Box::new(c2.clone().into()),
+                },
+            })),
+        ),
+        (
+            "ObjectMaxCardinality-qualified",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: c1.clone().into(),
+                sup: ClassExpression::ObjectMaxCardinality {
+                    n: 2,
+                    ope: p1.clone().into(),
+                    bce: Box::new(c2.clone().into()),
+                },
+            })),
+        ),
+        (
+            "ObjectExactCardinality-qualified",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: c1.clone().into(),
+                sup: ClassExpression::ObjectExactCardinality {
+                    n: 3,
+                    ope: p1.clone().into(),
+                    bce: Box::new(c2.clone().into()),
+                },
+            })),
+        ),
+        (
+            "DataSomeValuesFrom",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: c1.clone().into(),
+                sup: ClassExpression::DataSomeValuesFrom {
+                    dp: dp1.clone(),
+                    dr: DataRange::Datatype(xsd_string.clone()),
+                },
+            })),
+        ),
+        (
+            "DataAllValuesFrom",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: c1.clone().into(),
+                sup: ClassExpression::DataAllValuesFrom {
+                    dp: dp1.clone(),
+                    dr: DataRange::Datatype(xsd_string.clone()),
+                },
+            })),
+        ),
+        (
+            "DataHasValue",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: c1.clone().into(),
+                sup: ClassExpression::DataHasValue {
+                    dp: dp1.clone(),
+                    l: Literal::Simple {
+                        literal: "sample".to_string(),
+                    },
+                },
+            })),
+        ),
+        (
+            "DataMinCardinality-qualified",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: c1.clone().into(),
+                sup: ClassExpression::DataMinCardinality {
+                    n: 1,
+                    dp: dp1.clone(),
+                    dr: DataRange::Datatype(xsd_integer.clone()),
+                },
+            })),
+        ),
+        (
+            "DataMaxCardinality-qualified",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: c1.clone().into(),
+                sup: ClassExpression::DataMaxCardinality {
+                    n: 2,
+                    dp: dp1.clone(),
+                    dr: DataRange::Datatype(xsd_integer.clone()),
+                },
+            })),
+        ),
+        (
+            "DataExactCardinality-qualified",
+            plain(Component::SubClassOf(SubClassOf {
+                sub: c1.clone().into(),
+                sup: ClassExpression::DataExactCardinality {
+                    n: 3,
+                    dp: dp1.clone(),
+                    dr: DataRange::Datatype(xsd_integer.clone()),
+                },
+            })),
+        ),
+    ])
 }
 
 #[test]
-fn test_data_property_declaration() { 
+fn roundtrip_data_range_constructors() -> Result<()> {
     let b = Build::new();
-    let dp = DeclareDataProperty{ 0: b.data_property("http://www.example.com/op1").into() };
-    let dp_axiom = Axiom::DeclareDataProperty(dp); 
+    let xsd_string = b.datatype("http://www.w3.org/2001/XMLSchema#string");
+    let xsd_integer = b.datatype("http://www.w3.org/2001/XMLSchema#integer");
+    let dp1 = b.data_property("http://example.org/dp1");
 
-    let dp_ofn = axiom_transducer::translate(&dp_axiom);
-
-    let dp_ofn_expected = json!(["Declaration",["DataProperty","http://www.example.com/op1"]]);
-
-    assert_eq!(dp_ofn, dp_ofn_expected);
+    run_cases(vec![
+        (
+            "DataIntersectionOf",
+            plain(Component::DataPropertyRange(DataPropertyRange {
+                dp: dp1.clone(),
+                dr: DataRange::DataIntersectionOf(vec![
+                    DataRange::Datatype(xsd_string.clone()),
+                    DataRange::Datatype(xsd_integer.clone()),
+                ]),
+            })),
+        ),
+        (
+            "DataUnionOf",
+            plain(Component::DataPropertyRange(DataPropertyRange {
+                dp: dp1.clone(),
+                dr: DataRange::DataUnionOf(vec![
+                    DataRange::Datatype(xsd_string.clone()),
+                    DataRange::Datatype(xsd_integer.clone()),
+                ]),
+            })),
+        ),
+        (
+            "DataComplementOf",
+            plain(Component::DataPropertyRange(DataPropertyRange {
+                dp: dp1.clone(),
+                dr: DataRange::DataComplementOf(Box::new(DataRange::Datatype(
+                    xsd_string.clone(),
+                ))),
+            })),
+        ),
+        (
+            "DataOneOf",
+            plain(Component::DataPropertyRange(DataPropertyRange {
+                dp: dp1.clone(),
+                dr: DataRange::DataOneOf(vec![
+                    Literal::Simple {
+                        literal: "a".to_string(),
+                    },
+                    Literal::Simple {
+                        literal: "b".to_string(),
+                    },
+                ]),
+            })),
+        ),
+        (
+            "DatatypeRestriction",
+            plain(Component::DataPropertyRange(DataPropertyRange {
+                dp: dp1,
+                dr: DataRange::DatatypeRestriction(
+                    xsd_integer,
+                    vec![FacetRestriction {
+                        f: Facet::MinInclusive,
+                        l: Literal::Datatype {
+                            literal: "1".to_string(),
+                            datatype_iri: b.iri("http://www.w3.org/2001/XMLSchema#integer"),
+                        },
+                    }],
+                ),
+            })),
+        ),
+    ])
 }
-
-#[test]
-fn test_named_individual_declaration() { 
-    let b = Build::new();
-    let di = DeclareNamedIndividual{ 0: b.named_individual("http://www.example.com/i1").into() };
-    let di_axiom = Axiom::DeclareNamedIndividual(di); 
-
-    let di_ofn = axiom_transducer::translate(&di_axiom);
-
-    let di_ofn_expected = json!(["Declaration",["NamedIndividual","http://www.example.com/i1"]]);
-
-    assert_eq!(di_ofn, di_ofn_expected);
-}
-
-#[test]
-fn test_data_type_declaration() { 
-    let b = Build::new();
-    let dt = DeclareDatatype{ 0: b.datatype("http://www.example.com").into() };
-    let dt_axiom = Axiom::DeclareDatatype(dt); 
-
-    let dt_ofn = axiom_transducer::translate(&dt_axiom);
-
-    let dt_ofn_expected = json!(["Declaration",["Datatype","http://www.example.com"]]);
-
-    assert_eq!(dt_ofn, dt_ofn_expected);
-}
-
-#[test]
-fn test_sub_object_property_of() { 
-    let b = Build::new();
-    let sub = SubObjectPropertyOf{
-        sub: SubObjectPropertyExpression::ObjectPropertyExpression(b.object_property("http://www.example.com/op1").into()), 
-        sup: b.object_property("http://www.example.com/op2").into()};
-
-    let sub_axiom = Axiom::SubObjectPropertyOf(sub);
-
-    let sub_ofn = axiom_transducer::translate(&sub_axiom);
-
-    let sub_ofn_expected = json!(["SubObjectPropertyOf","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(sub_ofn, sub_ofn_expected);
-}
-
-
-#[test]
-fn test_sub_object_property_of_chain() { 
-    let b = Build::new();
-    let sub = SubObjectPropertyOf{
-        sub: SubObjectPropertyExpression::ObjectPropertyChain(
-                 vec!(b.object_property("http://www.example.com/op1").into(), 
-                      b.object_property("http://www.example.com/op2").into())),
-        sup: b.object_property("http://www.example.com/op3").into()};
-
-    let sub_axiom = Axiom::SubObjectPropertyOf(sub);
-
-    let sub_ofn = axiom_transducer::translate(&sub_axiom);
-
-    let sub_ofn_expected = json!(["SubObjectPropertyOf",["ObjectPropertyChain","http://www.example.com/op1","http://www.example.com/op2"],"http://www.example.com/op3"]);
-
-    assert_eq!(sub_ofn, sub_ofn_expected);
-}
-
-
-#[test]
-fn test_equivalent_object_properties_binary() { 
-    let b = Build::new();
-    let ep = EquivalentObjectProperties
-          (vec!(b.object_property("http://www.example.com/op1").into(),
-                b.object_property("http://www.example.com/op2").into()));
-    let ep_axiom = Axiom::EquivalentObjectProperties(ep); 
-
-    let ep_ofn = axiom_transducer::translate(&ep_axiom);
-
-    let ep_ofn_expected = json!(["EquivalentObjectProperties","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(ep_ofn, ep_ofn_expected);
-}
-
-#[test]
-fn test_equivalent_object_properties_nary() { 
-    let b = Build::new();
-    let ep = EquivalentObjectProperties
-          (vec!(b.object_property("http://www.example.com/op1").into(),
-                b.object_property("http://www.example.com/op2").into(),
-                b.object_property("http://www.example.com/op3").into(),
-                b.object_property("http://www.example.com/op4").into()));
-    let ep_axiom = Axiom::EquivalentObjectProperties(ep); 
-
-    let ep_ofn = axiom_transducer::translate(&ep_axiom);
-
-    let ep_ofn_expected = json!(["EquivalentObjectProperties","http://www.example.com/op1",
-                                                              "http://www.example.com/op2",
-                                                              "http://www.example.com/op3",
-                                                              "http://www.example.com/op4"]);
-
-    assert_eq!(ep_ofn, ep_ofn_expected);
-}
-
-#[test]
-fn test_inverse_object_properties() { 
-    let b = Build::new();
-    let ip = InverseObjectProperties{0: b.object_property("http://www.example.com/op1").into(),
-           1: b.object_property("http://www.example.com/op2").into()};
-    let ip_axiom = Axiom::InverseObjectProperties(ip); 
-
-    let ip_ofn = axiom_transducer::translate(&ip_axiom);
-
-    let ip_ofn_expected = json!(["InverseObjectProperties","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(ip_ofn, ip_ofn_expected);
-}
-
-#[test]
-fn test_object_property_domain() { 
-    let b = Build::new();
-    let pd = ObjectPropertyDomain{
-        ope: b.object_property("http://www.example.com/op1").into(),
-        ce: b.class("http://www.example.com/op2").into()};
-    let pd_axiom = Axiom::ObjectPropertyDomain(pd); 
-
-    let pd_ofn = axiom_transducer::translate(&pd_axiom);
-
-    let pd_ofn_expected = json!(["ObjectPropertyDomain","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(pd_ofn, pd_ofn_expected);
-}
-
-#[test]
-fn test_object_property_range() { 
-    let b = Build::new();
-    let pr = ObjectPropertyRange{
-        ope: b.object_property("http://www.example.com/op1").into(),
-        ce: b.class("http://www.example.com/op2").into()};
-    let pr_axiom = Axiom::ObjectPropertyRange(pr); 
-
-    let pr_ofn = axiom_transducer::translate(&pr_axiom);
-
-    let pr_ofn_expected = json!(["ObjectPropertyRange","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(pr_ofn, pr_ofn_expected);
-}
-
-#[test]
-fn test_functional_object_property() { 
-    let b = Build::new();
-    let pr = FunctionalObjectProperty{
-        0: b.object_property("http://www.example.com/op1").into()};
-    let pr_axiom = Axiom::FunctionalObjectProperty(pr); 
-
-    let pr_ofn = axiom_transducer::translate(&pr_axiom);
-
-    let pr_ofn_expected = json!(["FunctionalObjectProperty","http://www.example.com/op1"]);
-
-    assert_eq!(pr_ofn, pr_ofn_expected);
-}
-
-#[test]
-fn test_inverse_functional_object_property() { 
-    let b = Build::new();
-    let pr = InverseFunctionalObjectProperty{
-        0: b.object_property("http://www.example.com/op1").into()};
-    let pr_axiom = Axiom::InverseFunctionalObjectProperty(pr); 
-
-    let pr_ofn = axiom_transducer::translate(&pr_axiom);
-
-    let pr_ofn_expected = json!(["InverseFunctionalObjectProperty","http://www.example.com/op1"]);
-
-    assert_eq!(pr_ofn, pr_ofn_expected);
-}
-
-#[test]
-fn test_reflexive_object_property() { 
-    let b = Build::new();
-    let pr = ReflexiveObjectProperty{
-        0: b.object_property("http://www.example.com/op1").into()};
-    let pr_axiom = Axiom::ReflexiveObjectProperty(pr); 
-
-    let pr_ofn = axiom_transducer::translate(&pr_axiom);
-
-    let pr_ofn_expected = json!(["ReflexiveObjectProperty","http://www.example.com/op1"]);
-
-    assert_eq!(pr_ofn, pr_ofn_expected);
-}
-
-#[test]
-fn test_irreflexive_object_property() { 
-    let b = Build::new();
-    let pr = IrreflexiveObjectProperty{
-        0: b.object_property("http://www.example.com/op1").into()};
-    let pr_axiom = Axiom::IrreflexiveObjectProperty(pr); 
-
-    let pr_ofn = axiom_transducer::translate(&pr_axiom);
-
-    let pr_ofn_expected = json!(["IrreflexiveObjectProperty","http://www.example.com/op1"]);
-
-    assert_eq!(pr_ofn, pr_ofn_expected);
-}
-
-#[test]
-fn test_symmetric_object_property() { 
-    let b = Build::new();
-    let pr = SymmetricObjectProperty{
-        0: b.object_property("http://www.example.com/op1").into()};
-    let pr_axiom = Axiom::SymmetricObjectProperty(pr); 
-
-    let pr_ofn = axiom_transducer::translate(&pr_axiom);
-
-    let pr_ofn_expected = json!(["SymmetricObjectProperty","http://www.example.com/op1"]);
-
-    assert_eq!(pr_ofn, pr_ofn_expected);
-}
-
-#[test]
-fn test_asymmetric_object_property() { 
-    let b = Build::new();
-    let pr = AsymmetricObjectProperty{
-        0: b.object_property("http://www.example.com/op1").into()};
-    let pr_axiom = Axiom::AsymmetricObjectProperty(pr); 
-
-    let pr_ofn = axiom_transducer::translate(&pr_axiom);
-
-    let pr_ofn_expected = json!(["AsymmetricObjectProperty","http://www.example.com/op1"]);
-
-    assert_eq!(pr_ofn, pr_ofn_expected);
-}
-
-#[test]
-fn test_transitive_object_property() { 
-    let b = Build::new();
-    let pr = TransitiveObjectProperty{
-        0: b.object_property("http://www.example.com/op1").into()};
-    let pr_axiom = Axiom::TransitiveObjectProperty(pr); 
-
-    let pr_ofn = axiom_transducer::translate(&pr_axiom);
-
-    let pr_ofn_expected = json!(["TransitiveObjectProperty","http://www.example.com/op1"]);
-
-    assert_eq!(pr_ofn, pr_ofn_expected);
-}
-
-#[test]
-fn test_sub_data_property_of() { 
-    let b = Build::new();
-    let sub = SubDataPropertyOf{ 
-        sub: b.data_property("http://www.example.com/op1").into(),
-        sup: b.data_property("http://www.example.com/op2").into()};
-
-    let sub_axiom = Axiom::SubDataPropertyOf(sub);
-
-    let sub_ofn = axiom_transducer::translate(&sub_axiom);
-
-    let sub_ofn_expected = json!(["SubDataPropertyOf","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(sub_ofn, sub_ofn_expected);
-}
-
-#[test]
-fn test_equivalent_data_properties_binary() { 
-    let b = Build::new();
-    let ep = EquivalentDataProperties
-          (vec!(b.data_property("http://www.example.com/op1").into(),
-                b.data_property("http://www.example.com/op2").into()));
-    let ep_axiom = Axiom::EquivalentDataProperties(ep); 
-
-    let ep_ofn = axiom_transducer::translate(&ep_axiom);
-
-    let ep_ofn_expected = json!(["EquivalentDataProperties","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(ep_ofn, ep_ofn_expected);
-}
-
-#[test]
-fn test_equivalent_data_properties_nary() { 
-    let b = Build::new();
-    let ep = EquivalentDataProperties
-          (vec!(b.data_property("http://www.example.com/op1").into(),
-                b.data_property("http://www.example.com/op2").into(),
-                b.data_property("http://www.example.com/op3").into(),
-                b.data_property("http://www.example.com/op4").into() ));
-    let ep_axiom = Axiom::EquivalentDataProperties(ep); 
-
-    let ep_ofn = axiom_transducer::translate(&ep_axiom);
-
-    let ep_ofn_expected = json!(["EquivalentDataProperties","http://www.example.com/op1",
-                                                            "http://www.example.com/op2",
-                                                            "http://www.example.com/op3",
-                                                            "http://www.example.com/op4",
-    ]);
-
-    assert_eq!(ep_ofn, ep_ofn_expected);
-}
-
-#[test]
-fn test_disjoint_data_properties_binary() { 
-    let b = Build::new();
-    let ep = DisjointDataProperties
-          (vec!(b.data_property("http://www.example.com/op1").into(),
-                b.data_property("http://www.example.com/op2").into()));
-    let ep_axiom = Axiom::DisjointDataProperties(ep); 
-
-    let ep_ofn = axiom_transducer::translate(&ep_axiom);
-
-    let ep_ofn_expected = json!(["DisjointDataProperties","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(ep_ofn, ep_ofn_expected);
-}
-
-#[test]
-fn test_disjoint_data_properties_nary() { 
-    let b = Build::new();
-    let ep = DisjointDataProperties
-          (vec!(b.data_property("http://www.example.com/op1").into(),
-                b.data_property("http://www.example.com/op2").into(),
-                b.data_property("http://www.example.com/op3").into(),
-                b.data_property("http://www.example.com/op4").into()));
-    let ep_axiom = Axiom::DisjointDataProperties(ep); 
-
-    let ep_ofn = axiom_transducer::translate(&ep_axiom);
-
-    let ep_ofn_expected = json!(["DisjointDataProperties","http://www.example.com/op1",
-                                                          "http://www.example.com/op2",
-                                                          "http://www.example.com/op3",
-                                                          "http://www.example.com/op4"]);
-
-    assert_eq!(ep_ofn, ep_ofn_expected);
-}
-
-#[test]
-fn test_data_property_domain() { 
-    let b = Build::new();
-    let dd = DataPropertyDomain
-                {dp : b.data_property("http://www.example.com/op1").into(),
-                ce: b.class("http://www.example.com/op2").into()};
-
-    let dd_axiom = Axiom::DataPropertyDomain(dd); 
-
-    let dd_ofn = axiom_transducer::translate(&dd_axiom);
-
-    let dd_ofn_expected = json!(["DataPropertyDomain","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(dd_ofn, dd_ofn_expected);
-}
-
-#[test]
-fn test_data_property_range() { 
-    let b = Build::new();
-    let dt = b.datatype("http://www.example.com").into();
-
-    let dr = DataPropertyRange
-                {dp : b.data_property("http://www.example.com/op1").into(),
-                dr: DataRange::Datatype(dt) };
-
-    let dr_axiom = Axiom::DataPropertyRange(dr); 
-
-    let dr_ofn = axiom_transducer::translate(&dr_axiom);
-
-    let dr_ofn_expected = json!(["DataPropertyRange","http://www.example.com/op1","http://www.example.com"]);
-
-    assert_eq!(dr_ofn, dr_ofn_expected);
-}
-
-#[test]
-fn test_functional_data_property() { 
-    let b = Build::new();
-
-    let fp = FunctionalDataProperty
-                {0 : b.data_property("http://www.example.com/op1").into() };
-
-    let fp_axiom = Axiom::FunctionalDataProperty(fp); 
-
-    let fp_ofn = axiom_transducer::translate(&fp_axiom);
-
-    let fp_ofn_expected = json!(["FunctionalDataProperty","http://www.example.com/op1"]);
-
-    assert_eq!(fp_ofn, fp_ofn_expected);
-}
-
-#[test]
-fn test_datatype_definition() { 
-    let b = Build::new();
-    let dt = b.datatype("http://www.example.com").into();
-
-    let dd = DatatypeDefinition
-                {kind : b.datatype("http://www.example.uk").into(),
-                range:  DataRange::Datatype(dt) };
-
-    let dd_axiom = Axiom::DatatypeDefinition(dd); 
-
-    let dd_ofn = axiom_transducer::translate(&dd_axiom);
-
-    let dd_ofn_expected = json!(["DatatypeDefinition","http://www.example.uk","http://www.example.com"]);
-
-    assert_eq!(dd_ofn, dd_ofn_expected);
-}
-
-#[test]
-fn test_same_individual_binary() { 
-    let b = Build::new();
-
-    let si = SameIndividual
-                {0 :  vec!(b.named_individual("http://www.example.com/op1").into(),
-                           b.named_individual("http://www.example.com/op2").into())
-                 };
-
-    let si_axiom = Axiom::SameIndividual(si); 
-
-    let si_ofn = axiom_transducer::translate(&si_axiom);
-
-    let si_ofn_expected = json!(["SameIndividual","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(si_ofn, si_ofn_expected);
-}
-
-#[test]
-fn test_same_individual_nary() { 
-    let b = Build::new();
-
-    let si = SameIndividual
-                {0 :  vec!(b.named_individual("http://www.example.com/op1").into(),
-                           b.named_individual("http://www.example.com/op2").into(),
-                           b.named_individual("http://www.example.com/op3").into(),
-                           b.named_individual("http://www.example.com/op4").into())
-                 };
-
-    let si_axiom = Axiom::SameIndividual(si); 
-
-    let si_ofn = axiom_transducer::translate(&si_axiom);
-
-    let si_ofn_expected = json!(["SameIndividual","http://www.example.com/op1",
-                                                  "http://www.example.com/op2",
-                                                  "http://www.example.com/op3",
-                                                  "http://www.example.com/op4"]);
-
-    assert_eq!(si_ofn, si_ofn_expected);
-}
-
-#[test]
-fn test_different_individuals_binary() { 
-    let b = Build::new();
-
-    let di = DifferentIndividuals
-                {0 :  vec!(b.named_individual("http://www.example.com/op1").into(),
-                           b.named_individual("http://www.example.com/op2").into())
-                 };
-
-    let di_axiom = Axiom::DifferentIndividuals(di); 
-
-    let di_ofn = axiom_transducer::translate(&di_axiom);
-
-    let di_ofn_expected = json!(["DifferentIndividuals","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(di_ofn, di_ofn_expected);
-}
-
-#[test]
-fn test_different_individuals_nary() { 
-    let b = Build::new();
-
-    let di = DifferentIndividuals
-                {0 :  vec!(b.named_individual("http://www.example.com/op1").into(),
-                           b.named_individual("http://www.example.com/op2").into(),
-                           b.named_individual("http://www.example.com/op3").into(),
-                           b.named_individual("http://www.example.com/op4").into())
-                 };
-
-    let di_axiom = Axiom::DifferentIndividuals(di); 
-
-    let di_ofn = axiom_transducer::translate(&di_axiom);
-
-    let di_ofn_expected = json!(["DifferentIndividuals","http://www.example.com/op1",
-                                                        "http://www.example.com/op2",
-                                                        "http://www.example.com/op3",
-                                                        "http://www.example.com/op4"]);
-
-    assert_eq!(di_ofn, di_ofn_expected);
-}
-
-#[test]
-fn test_class_assertion() { 
-    let b = Build::new();
-
-    let ca = ClassAssertion
-                {ce : b.class("http://www.example.com/op1").into(),
-                i : b.named_individual("http://www.example.com/op2").into() };
-
-    let ca_axiom = Axiom::ClassAssertion(ca); 
-
-    let ca_ofn = axiom_transducer::translate(&ca_axiom);
-
-    let ca_ofn_expected = json!(["ClassAssertion","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(ca_ofn, ca_ofn_expected);
-}
-
-#[test]
-fn test_object_property_assertion() { 
-    let b = Build::new();
-
-    let oa = ObjectPropertyAssertion
-                {ope : b.object_property("http://www.example.com/op1").into(),
-                from : b.named_individual("http://www.example.com/op2").into(), 
-                to : b.named_individual("http://www.example.com/op3").into() };
-
-    let oa_axiom = Axiom::ObjectPropertyAssertion(oa); 
-
-    let oa_ofn = axiom_transducer::translate(&oa_axiom);
-
-    let oa_ofn_expected = json!(["ObjectPropertyAssertion","http://www.example.com/op1","http://www.example.com/op2","http://www.example.com/op3"]);
-
-    assert_eq!(oa_ofn, oa_ofn_expected);
-}
-
-#[test]
-fn test_negative_object_property_assertion() { 
-    let b = Build::new();
-
-    let oa = NegativeObjectPropertyAssertion
-                {ope : b.object_property("http://www.example.com/op1").into(),
-                from : b.named_individual("http://www.example.com/op2").into(), 
-                to : b.named_individual("http://www.example.com/op3").into() };
-
-    let oa_axiom = Axiom::NegativeObjectPropertyAssertion(oa); 
-
-    let oa_ofn = axiom_transducer::translate(&oa_axiom);
-
-    let oa_ofn_expected = json!(["NegativeObjectPropertyAssertion","http://www.example.com/op1","http://www.example.com/op2","http://www.example.com/op3"]);
-
-    assert_eq!(oa_ofn, oa_ofn_expected);
-}
-
-
-#[test]
-fn test_data_property_assertion_simple() { 
-    let b = Build::new();
-    let simple_literal = Literal::Simple{literal: String::from("literal")};
-
-    let da = DataPropertyAssertion
-                {dp : b.data_property("http://www.example.com/op1").into(),
-                from : b.named_individual("http://www.example.com/op2").into(), 
-                to : simple_literal };
-
-    let da_axiom = Axiom::DataPropertyAssertion(da); 
-
-    let da_ofn = axiom_transducer::translate(&da_axiom);
-
-    let da_ofn_expected = json!(["DataPropertyAssertion","http://www.example.com/op1","http://www.example.com/op2","\"literal\""]);
-
-    assert_eq!(da_ofn, da_ofn_expected);
-}
-
-#[test]
-fn test_data_property_assertion_language() { 
-    let b = Build::new();
-    let language_literal = Literal::Language{literal: String::from("literal"),
-                                             lang: String::from("en") };
-
-    let da = DataPropertyAssertion
-                {dp : b.data_property("http://www.example.com/op1").into(),
-                from : b.named_individual("http://www.example.com/op2").into(), 
-                to : language_literal };
-
-    let da_axiom = Axiom::DataPropertyAssertion(da); 
-
-    let da_ofn = axiom_transducer::translate(&da_axiom);
-
-    let da_ofn_expected = json!(["DataPropertyAssertion","http://www.example.com/op1","http://www.example.com/op2","\"literal\"@en"]);
-
-    assert_eq!(da_ofn, da_ofn_expected);
-}
-
-#[test]
-fn test_data_property_assertion_datatype() { 
-    let b = Build::new();
-    let typed_literal = Literal::Datatype{literal: String::from("literal"),
-                                             datatype_iri: b.iri("http://www.example.com") };
-
-    let da = DataPropertyAssertion
-                {dp : b.data_property("http://www.example.com/op1").into(),
-                from : b.named_individual("http://www.example.com/op2").into(), 
-                to : typed_literal };
-
-    let da_axiom = Axiom::DataPropertyAssertion(da); 
-
-    let da_ofn = axiom_transducer::translate(&da_axiom);
-
-    let da_ofn_expected = json!(["DataPropertyAssertion","http://www.example.com/op1","http://www.example.com/op2","\"literal\"^^http://www.example.com"]);
-
-    assert_eq!(da_ofn, da_ofn_expected);
-}
-
-#[test]
-fn test_negative_data_property_assertion_simple() { 
-    let b = Build::new();
-    let simple_literal = Literal::Simple{literal: String::from("literal")};
-
-    let da = NegativeDataPropertyAssertion
-                {dp : b.data_property("http://www.example.com/op1").into(),
-                from : b.named_individual("http://www.example.com/op2").into(), 
-                to : simple_literal };
-
-    let da_axiom = Axiom::NegativeDataPropertyAssertion(da); 
-
-    let da_ofn = axiom_transducer::translate(&da_axiom);
-
-    let da_ofn_expected = json!(["NegativeDataPropertyAssertion","http://www.example.com/op1","http://www.example.com/op2","\"literal\""]);
-
-    assert_eq!(da_ofn, da_ofn_expected);
-}
-
-#[test]
-fn test_negative_data_property_assertion_language() { 
-    let b = Build::new();
-    let language_literal = Literal::Language{literal: String::from("literal"),
-                                             lang: String::from("en") };
-
-    let da = NegativeDataPropertyAssertion
-                {dp : b.data_property("http://www.example.com/op1").into(),
-                from : b.named_individual("http://www.example.com/op2").into(), 
-                to : language_literal };
-
-    let da_axiom = Axiom::NegativeDataPropertyAssertion(da); 
-
-    let da_ofn = axiom_transducer::translate(&da_axiom);
-
-    let da_ofn_expected = json!(["NegativeDataPropertyAssertion","http://www.example.com/op1","http://www.example.com/op2","\"literal\"@en"]);
-
-    assert_eq!(da_ofn, da_ofn_expected);
-}
-
-#[test]
-fn test_negative_data_property_assertion_datatype() { 
-    let b = Build::new();
-    let typed_literal = Literal::Datatype{literal: String::from("literal"),
-                                             datatype_iri: b.iri("http://www.example.com") };
-
-    let da = NegativeDataPropertyAssertion
-                {dp : b.data_property("http://www.example.com/op1").into(),
-                from : b.named_individual("http://www.example.com/op2").into(), 
-                to : typed_literal };
-
-    let da_axiom = Axiom::NegativeDataPropertyAssertion(da); 
-
-    let da_ofn = axiom_transducer::translate(&da_axiom);
-
-    let da_ofn_expected = json!(["NegativeDataPropertyAssertion","http://www.example.com/op1","http://www.example.com/op2","\"literal\"^^http://www.example.com"]);
-
-    assert_eq!(da_ofn, da_ofn_expected);
-}
-
-#[test]
-fn test_annotation_assertion() { 
-    let b = Build::new();
-    let annotation_subject = AnnotationSubject::IRI(b.iri("http://www.example.com/op1"));
-    let annotation = Annotation{ ap : b.annotation_property("http://www.example.com/op2"),
-                                 av : AnnotationValue::IRI(b.iri("http://www.example.com/op3"))};
-
-    let aa = AnnotationAssertion
-                {subject : annotation_subject,
-                ann : annotation };
-
-    let aa_axiom = Axiom::AnnotationAssertion(aa); 
-
-    let aa_ofn = axiom_transducer::translate(&aa_axiom);
-
-    let aa_ofn_expected = json!(["AnnotationAssertion","http://www.example.com/op1","http://www.example.com/op2","http://www.example.com/op3"]);
-
-    assert_eq!(aa_ofn, aa_ofn_expected);
-}
-
-#[test]
-fn test_sub_annotation_property_of() { 
-    let b = Build::new();
-
-    let aa = SubAnnotationPropertyOf
-                {sub : b.annotation_property("http://www.example.com/op1"),
-                 sup : b.annotation_property("http://www.example.com/op2")};
-
-    let aa_axiom = Axiom::SubAnnotationPropertyOf(aa); 
-
-    let aa_ofn = axiom_transducer::translate(&aa_axiom);
-
-    let aa_ofn_expected = json!(["SubAnnotationPropertyOf","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(aa_ofn, aa_ofn_expected);
-}
-
-#[test]
-fn test_annotation_property_domain() { 
-    let b = Build::new();
-
-    let aa = AnnotationPropertyDomain
-                {ap : b.annotation_property("http://www.example.com/op1"),
-                 iri : b.iri("http://www.example.com/op2")};
-
-    let aa_axiom = Axiom::AnnotationPropertyDomain(aa); 
-
-    let aa_ofn = axiom_transducer::translate(&aa_axiom);
-
-    let aa_ofn_expected = json!(["AnnotationPropertyDomain","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(aa_ofn, aa_ofn_expected);
-}
-
-#[test]
-fn test_annotation_property_range() { 
-    let b = Build::new();
-
-    let aa = AnnotationPropertyRange
-                {ap : b.annotation_property("http://www.example.com/op1"),
-                 iri : b.iri("http://www.example.com/op2")};
-
-    let aa_axiom = Axiom::AnnotationPropertyRange(aa); 
-
-    let aa_ofn = axiom_transducer::translate(&aa_axiom);
-
-    let aa_ofn_expected = json!(["AnnotationPropertyRange","http://www.example.com/op1","http://www.example.com/op2"]);
-
-    assert_eq!(aa_ofn, aa_ofn_expected);
-}
-
